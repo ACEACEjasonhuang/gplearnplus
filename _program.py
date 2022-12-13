@@ -28,7 +28,6 @@ class _Program(object):
     def __init__(self,
                  function_set,
                  arities,
-                 param_type_list,
                  init_depth,
                  init_method,
                  n_features,
@@ -43,7 +42,6 @@ class _Program(object):
 
         self.function_set = function_set
         self.arities = arities
-        self.param_type_list = param_type_list
         self.init_depth = (init_depth[0], init_depth[1] + 1)
         self.init_method = init_method
         self.n_features = n_features
@@ -292,7 +290,6 @@ class _Program(object):
             return X[:, int(node)]
 
         apply_stack = []
-
         for node in self.program:
 
             if isinstance(node, _Function):
@@ -305,8 +302,8 @@ class _Program(object):
                 # Apply functions that have sufficient arguments
                 function = apply_stack[-1][0]
                 terminals = [np.repeat(t, X.shape[0]) if isinstance(t, (float, int))
-                             else X[:, int(t)] if isinstance(t, str)
-                else t for t in apply_stack[-1][1:]]
+                             else (X[:, int(t)] if isinstance(t, str)
+                             else t) for t in apply_stack[-1][1:]]
                 intermediate_result = function(*terminals)
                 if len(apply_stack) != 1:
                     apply_stack.pop()
@@ -602,7 +599,8 @@ class _Program(object):
             else:
                 # 常数不发生变异
                 tag[i] = False
-        mutate = mutate[tag]
+        if len(mutate):
+            mutate = mutate[tag]
         return program, list(mutate)
 
     depth_ = property(_depth)

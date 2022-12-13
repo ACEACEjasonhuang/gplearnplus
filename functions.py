@@ -40,6 +40,8 @@ class _Function(object):
         self.function = function
         self.name = name
         self.arity = arity
+        if param_type is None:
+            param_type = arity * [{'vector': (None, None), 'int': (None, None), 'float': (None, None)}]
         self.param_type = param_type
 
     def __call__(self, *args):
@@ -49,13 +51,13 @@ class _Function(object):
         # 替换掉参数中没有约束的范围
         # 去掉所有的const type
         if const_range is None:
-            for i, _dict in enumerate(param_type):
+            for i, _dict in enumerate(self.param_type):
                 if 'vector' not in _dict:
                     raise ValueError("for None const range, vector type should in all function param")
                 if 'int' in _dict:
-                    param_type[i].pop('int')
+                    self.param_type[i].pop('int')
                 if 'float' in _dict:
-                    param_type[i].pop('float')
+                    self.param_type[i].pop('float')
             return
         if not isinstance(const_range, tuple):
             raise ValueError('const_range must be an tuple')
@@ -67,15 +69,15 @@ class _Function(object):
         if _min > _max:
             raise ValueError('const_range left should le right')
 
-        for i, _dict in enumerate(param_type):
+        for i, _dict in enumerate(self.param_type):
             if 'int' in _dict:
                 _l = int(_min) if _dict['int'][0] is None else int(_dict['int'][0])
                 _r = int(_max) if _dict['int'][1] is None else int(_dict['int'][1])
-                param_type[i]['int'] = (_l, _r)
+                self.param_type[i]['int'] = (_l, _r)
             if 'float' in _dict:
                 _l = float(_min) if _dict['float'][0] is None else float(_dict['float'][0])
                 _r = float(_max) if _dict['float'][1] is None else float(_dict['float'][1])
-                param_type[i]['float'] = (_l, _r)
+                self.param_type[i]['float'] = (_l, _r)
 
         return
 
@@ -134,10 +136,13 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
         raise ValueError('wrap must be an bool, got %s' % type(wrap))
 
     # check out param_type vector > int > float
+    if param_type is None:
+        param_type = [None] * arity
     if not isinstance(param_type, list):
         raise ValueError('param_type must be list')
     if len(param_type) != arity:
         raise ValueError('len of param_type must be arity')
+
 
     vector_flag = False
     for i, _dict in enumerate(param_type):
@@ -183,9 +188,7 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
                     raise ValueError('dict_second_element should ge dict_first_element')
             else:
                 raise ValueError('key of element in param_type must be vector, int or float')
-            # arity 不接受
-            if non_vector_param:
-                arity -= 1
+
     if not vector_flag:
         raise ValueError('there is at least  1 vector in param_type')
 
@@ -195,11 +198,11 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
         if 'vector' in _dict:
             args.append(np.ones(10))
         elif 'int' in _dict:
-            args.append((0 if _dict['int'][1] is None else _dict['int'][1] +
-                                                           0 if _dict['int'][0] is None else _dict['int'][0]) // 2)
+            args.append(((0 if _dict['int'][1] is None else _dict['int'][1]) +
+                         (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
         else:
-            args.append((0 if _dict['float'][1] is None else _dict['float'][1] +
-                                                           0 if _dict['float'][0] is None else _dict['float'][0]) / 2)
+            args.append(((0 if _dict['float'][1] is None else _dict['float'][1]) +
+                         (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
 
     try:
         function(*args)
@@ -221,20 +224,21 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
             args2.append(np.zeros(10))
             args3.append(-1 * np.ones(10))
         elif 'int' in _dict:
-            _temp = (0 if _dict['int'][1] is None else _dict['int'][1] +
-                                                           0 if _dict['int'][0] is None else _dict['int'][0]) // 2
+            _temp = (((0 if _dict['int'][1] is None else _dict['int'][1]) +
+                      (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
             args2.append(_temp)
             args3.append(_temp)
         else:
-            _temp = (0 if _dict['float'][1] is None else _dict['float'][1] +
-                                                       0 if _dict['float'][0] is None else _dict['float'][0]) / 2
+            _temp = (((0 if _dict['float'][1] is None else _dict['float'][1]) +
+                      (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
             args2.append(_temp)
             args3.append(_temp)
 
-    if not np.all(np.isfinite(function(*args2))):
+    if not np.all(np.isnan(function(*args2)) | np.isfinite(function(*args2))):
         raise ValueError('supplied function %s does not have closure against '
                          'zeros in argument vectors.' % name)
-    if not np.all(np.isfinite(function(*args3))):
+
+    if not np.all(np.isnan(function(*args3)) | np.isfinite(function(*args3))):
         raise ValueError('supplied function %s does not have closure against '
                          'negatives in argument vectors.' % name)
     if wrap:

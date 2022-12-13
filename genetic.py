@@ -473,14 +473,18 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             self._verbose_reporter()
 
         for gen in range(prior_generations, self.generations):
-
             start_time = time()
 
             if gen == 0:
                 parents = None
             else:
-                parents = self._programs[gen - 1]
+                try:
+                    parents = self._programs[gen - 1]
+                except:
+                    print(len(self._programs))
+                    print(gen)
 
+                    exit()
             # Parallel loop
             # 将population_size分配给n_job个进程
             n_jobs, n_programs, starts = _partition_estimators(self.population_size, self.n_jobs)
@@ -511,6 +515,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                                          np.var(length))
             for program in population:
                 program.fitness_ = program.fitness(parsimony_coefficient)
+
+            self._programs.append(population)
 
             # 去除没有进入下一代的父辈种群
             if not self.low_memory:
@@ -877,3 +883,4 @@ class SymbolicTransformer(BaseSymbolic, TransformerMixin):
     def fit_transform(self, X, y, sample_weight=None):
         # 训练之后转换
         return self.fit(X, y, sample_weight).transform(X)
+
