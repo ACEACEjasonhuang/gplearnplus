@@ -15,6 +15,15 @@ import numpy as np
 from copy import copy
 
 
+def no_numpy_warning(func):
+    @wraps(func)
+    def warp(*args, **kwargs):
+        with np.errstate(all='ignore'):
+            _res = func(*args, **kwargs)
+            return _res
+    return warp
+
+
 def handle_nan(X):
     X = copy(X)
     _temp = np.nan
@@ -26,10 +35,13 @@ def handle_nan(X):
     na_len = len(np.where(np.isnan(X))[0])
     return X, na_len
 
+
+@no_numpy_warning
 def _neg(X):
     return -X
 
 
+@no_numpy_warning
 def _delay(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -39,6 +51,7 @@ def _delay(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _delta(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -49,6 +62,7 @@ def _delta(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_min(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -58,6 +72,7 @@ def _ts_min(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_max(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -67,6 +82,7 @@ def _ts_max(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_argmax(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -76,6 +92,7 @@ def _ts_argmax(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_argmin(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -85,6 +102,7 @@ def _ts_argmin(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_rank(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -94,6 +112,7 @@ def _ts_rank(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_sum(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -103,6 +122,7 @@ def _ts_sum(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_stddev(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -110,6 +130,7 @@ def _ts_stddev(X, d):
     assert len(X) > d
     __res = [np.nan] * (d - 1) + [np.nansum(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
+
 
 
 def _corrcoef_plus(X, Y):
@@ -122,7 +143,7 @@ def _corrcoef_plus(X, Y):
         return np.corrcoef(X_, Y_)[0][1]
 
 
-
+@no_numpy_warning
 def _ts_corr(X, Y, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -133,6 +154,7 @@ def _ts_corr(X, Y, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _ts_mean_return(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -142,6 +164,7 @@ def _ts_mean_return(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _EMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -161,6 +184,7 @@ def _EMA(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _DEMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -172,6 +196,7 @@ def _DEMA(X, d):
     return __res
 
 
+@no_numpy_warning
 def _MA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -185,6 +210,7 @@ def _MA(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _KAMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -206,6 +232,7 @@ def _KAMA(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _MIDPONIT(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -215,6 +242,8 @@ def _MIDPONIT(X, d):
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+
+@no_numpy_warning
 def _BETA(X, Y, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -229,6 +258,7 @@ def _BETA(X, Y, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _LINEARREG_SLOPE(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -241,6 +271,7 @@ def _LINEARREG_SLOPE(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _LINEARREG_ANGLE(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -253,6 +284,7 @@ def _LINEARREG_ANGLE(X, d):
     return np.array(__res)
 
 
+@no_numpy_warning
 def _LINEARREG_INTERCEPT(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
@@ -264,47 +296,48 @@ def _LINEARREG_INTERCEPT(X, d):
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
-neg = make_function(function=_neg, name='neg', arity=1, param_type=[{'vector': (None, None)}])
 
-delay = make_function(function=_delay, name='delay', arity=2,
+neg = functions.make_function(function=_neg, name='neg', arity=1, param_type=[{'vector': (None, None)}])
+
+delay = functions.make_function(function=_delay, name='delay', arity=2,
                                  param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-delta = make_function(function=_delta, name='delta', arity=2,
+delta = functions.make_function(function=_delta, name='delta', arity=2,
                                  param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_min = make_function(function=_ts_min, name='ts_min', arity=2,
+ts_min = functions.make_function(function=_ts_min, name='ts_min', arity=2,
                                  param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_max = make_function(function=_ts_max, name='ts_max', arity=2,
+ts_max = functions.make_function(function=_ts_max, name='ts_max', arity=2,
                                   param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_argmax = make_function(function=_ts_argmax, name='ts_argmax', arity=2,
+ts_argmax = functions.make_function(function=_ts_argmax, name='ts_argmax', arity=2,
                                      param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_argmin = make_function(function=_ts_argmin, name='ts_argmax', arity=2,
+ts_argmin = functions.make_function(function=_ts_argmin, name='ts_argmax', arity=2,
                                      param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_rank = make_function(function=_ts_rank, name='ts_rank', arity=2,
+ts_rank = functions.make_function(function=_ts_rank, name='ts_rank', arity=2,
                                   param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_sum = make_function(function=_ts_sum, name='ts_sum', arity=2,
+ts_sum = functions.make_function(function=_ts_sum, name='ts_sum', arity=2,
                                  param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_stddev = make_function(function=_ts_stddev, name='ts_stddev', arity=2,
+ts_stddev = functions.make_function(function=_ts_stddev, name='ts_stddev', arity=2,
                                     param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-ts_corr = make_function(function=_ts_corr, name='ts_corr', arity=3,
+ts_corr = functions.make_function(function=_ts_corr, name='ts_corr', arity=3,
                                   param_type=[{'vector': (None, None)}, {'vector': (None, None)}, {'int':(3, 30)}])
-ts_mean_return = make_function(function=_ts_mean_return, name='ts_mean_return', arity=2,
+ts_mean_return = functions.make_function(function=_ts_mean_return, name='ts_mean_return', arity=2,
                                          param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-EMA = make_function(function=_EMA, name='EMA', arity=2,
+EMA = functions.make_function(function=_EMA, name='EMA', arity=2,
                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-DEMA = make_function(function=_DEMA, name='DEMA', arity=2,
+DEMA = functions.make_function(function=_DEMA, name='DEMA', arity=2,
                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-KAMA = make_function(function=_DEMA, name='DEMA', arity=2,
+KAMA = functions.make_function(function=_DEMA, name='DEMA', arity=2,
                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-MA = make_function(function=_MA, name='MA', arity=2,
+MA = functions.make_function(function=_MA, name='MA', arity=2,
                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-MIDPOINT = make_function(function=_MA, name='MA', arity=2,
+MIDPOINT = functions.make_function(function=_MA, name='MA', arity=2,
                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-BETA = make_function(function=_BETA, name='BETA', arity=3,
+BETA = functions.make_function(function=_BETA, name='BETA', arity=3,
                                param_type=[{'vector': (None, None)}, {'vector': (None, None)}, {'int':(3, 30)}])
-LINEARREG_SLOPE = make_function(function=_LINEARREG_SLOPE, name='LINEARREG_SLOPE', arity=2,
+LINEARREG_SLOPE = functions.make_function(function=_LINEARREG_SLOPE, name='LINEARREG_SLOPE', arity=2,
                                           param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-LINEARREG_ANGLE = make_function(function=_LINEARREG_ANGLE, name='LINEARREG_ANGLE', arity=2,
+LINEARREG_ANGLE = functions.make_function(function=_LINEARREG_ANGLE, name='LINEARREG_ANGLE', arity=2,
                                           param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
-LINEARREG_INTERCEPT = make_function(function=_LINEARREG_INTERCEPT, name='LINEARREG_INTERCEPT', arity=2,
+LINEARREG_INTERCEPT = functions.make_function(function=_LINEARREG_INTERCEPT, name='LINEARREG_INTERCEPT', arity=2,
                                               param_type=[{'vector': (None, None)}, {'int':(3, 30)}])
 __all__ = ['neg', 'delay', 'delta', 'ts_min', 'ts_max', 'ts_sum', 'ts_corr', 'ts_rank', 'ts_stddev', 'ts_argmax',
            'ts_argmin', 'ts_mean_return', 'EMA', 'DEMA', 'KAMA', 'MA', 'MIDPOINT', 'BETA', 'LINEARREG_ANGLE',
