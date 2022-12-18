@@ -10,3 +10,7 @@
 
 # v1.2
 test中加入了自定义函数的定义方法，需要忽略运行时的RuntimeWarning
+
+# v1.3
+functions中去掉了对于function.__code__.co_argument的限制
+增强对函数修饰器的兼容

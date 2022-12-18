@@ -125,11 +125,6 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
 
     if not isinstance(arity, int):
         raise ValueError('arity must be an int, got %s' % type(arity))
-    if not isinstance(function, np.ufunc):
-        if function.__code__.co_argcount != arity:
-            raise ValueError('arity %d does not match required number of '
-                             'function arguments of %d.'
-                             % (arity, function.__code__.co_argcount))
     if not isinstance(name, str):
         raise ValueError('name must be a string, got %s' % type(name))
     if not isinstance(wrap, bool):
