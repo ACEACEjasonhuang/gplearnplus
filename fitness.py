@@ -16,7 +16,7 @@ import numpy as np
 from joblib import wrap_non_picklable_objects
 from scipy.stats import rankdata
 
-__all__ = ['make_fitness']
+__all__ = ['make_fitness', '_fitness_map', '_Fitness']
 
 
 class _Fitness(object):

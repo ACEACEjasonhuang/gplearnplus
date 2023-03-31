@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 -------------------------------------------------
-# @Project  :gplearnplus 
-# @File     :test
-# @Date     :2022/12/13 0013 2:05 
+# @Project  :gplearn
+# @File     :test.py
+# @Date     :2023/3/31 0013 17:37
 # @Author   :Junzhe Huang
 # @Email    :acejasonhuang@163.com
 # @Software :PyCharm
 -------------------------------------------------
 """
-from .genetic import SymbolicTransformer
-from .functions import make_function
 import numpy as np
 from copy import copy
+from gplearnplus import functions
+from functools import wraps
 
 
 def no_numpy_warning(func):
@@ -46,7 +46,7 @@ def _delay(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * d + list(X[:-d])
     return np.array(__res)
 
@@ -56,7 +56,7 @@ def _delta(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * d + list(X[:-d])
     __res = X - __res
     return np.array(__res)
@@ -67,7 +67,7 @@ def _ts_min(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.nanmin(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -77,7 +77,7 @@ def _ts_max(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.nanmax(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -87,7 +87,7 @@ def _ts_argmax(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.argmax(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -97,7 +97,7 @@ def _ts_argmin(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.argmin(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -107,7 +107,7 @@ def _ts_rank(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [(np.argsort(X[i:i + d])[-1] / d) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -117,7 +117,7 @@ def _ts_sum(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.nansum(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -127,10 +127,9 @@ def _ts_stddev(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.nansum(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
-
 
 
 def _corrcoef_plus(X, Y):
@@ -148,7 +147,7 @@ def _ts_corr(X, Y, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     assert len(X) == len(Y)
     __res = [np.nan] * (d - 1) + [_corrcoef_plus(X[i:i + d], Y[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
@@ -159,7 +158,7 @@ def _ts_mean_return(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [np.mean(np.diff(X[i:i + d]) / X[i:i + d - 1]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
@@ -169,7 +168,7 @@ def _EMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     X, _l = handle_nan(X)
     X = X[_l:]
     if len(X) < d:
@@ -189,7 +188,7 @@ def _DEMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > 2 * d - 2
+    d = d if len(X) > 2 * d - 2 else len(X) // 2 - 1
     _ema = _EMA(X, d)
     _eema = _EMA(_ema, d)
     __res = 2 * _ema - _eema
@@ -201,7 +200,7 @@ def _MA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     X, _l = handle_nan(X)
     X = X[_l:]
     if len(X) < d:
@@ -215,7 +214,7 @@ def _KAMA(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     X, _l = handle_nan(X)
     X = X[_l:]
     if len(X) < d:
@@ -237,7 +236,7 @@ def _MIDPONIT(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     __res = [np.nan] * (d - 1) + [(np.nanmax(X[i:i + d]) + np.nanmin(X[i:i + d])) / 2
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
@@ -248,7 +247,7 @@ def _BETA(X, Y, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     assert len(X) == len(Y)
     X = np.diff(X) / X[:-1]
     Y = np.diff(Y) / Y[:-1]
@@ -263,7 +262,7 @@ def _LINEARREG_SLOPE(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     Y = np.arange(d)
     __res = [np.nan] * (d - 1) + [_corrcoef_plus(X[i:i + d], Y)
                                   * np.std(X[i:i + d]) / np.std(Y)
@@ -276,7 +275,7 @@ def _LINEARREG_ANGLE(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     Y = np.arange(d)
     __res = [np.nan] * (d - 1) + [np.arctan(_corrcoef_plus(X[i:i + d], Y)
                                   * np.std(X[i:i + d]) / np.std(Y)) * (180.0 / np.pi)
@@ -289,7 +288,7 @@ def _LINEARREG_INTERCEPT(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
-    assert len(X) > d
+    d = len(X) - 1 if d >= len(X) else d
     Y = np.arange(d)
     __res = [np.nan] * (d - 1) + [(np.sum(X[i:i + d]) - (_corrcoef_plus(X[i:i + d], Y)
                                   * np.std(X[i:i + d]) / np.std(Y)) * np.sum(Y)) / d
@@ -343,3 +342,13 @@ __all__ = ['neg', 'delay', 'delta', 'ts_min', 'ts_max', 'ts_sum', 'ts_corr', 'ts
            'ts_argmin', 'ts_mean_return', 'EMA', 'DEMA', 'KAMA', 'MA', 'MIDPOINT', 'BETA', 'LINEARREG_ANGLE',
            'LINEARREG_SLOPE', 'LINEARREG_INTERCEPT']
 
+
+if __name__ == "__main__":
+    a = np.random.uniform(0.9, 1.1, 30)
+    b = np.random.uniform(0.9, 1.1, 30)
+
+    a = np.cumprod(a)
+    b = np.cumprod(b)
+    a[5] = np.nan
+    b[6] = np.nan
+    print(_EMA(_EMA(a, 10), 10))

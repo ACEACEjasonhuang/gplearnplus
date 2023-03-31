@@ -68,3 +68,7 @@ test中加入了自定义函数的定义方法，需要忽略运行时的Runtime
 
 functions中去掉了对于function.__code__.co_argument的限制
 增强对函数修饰器的兼容
+
+## v1.4
+test.py debug
+函数定义考虑特殊参数情况

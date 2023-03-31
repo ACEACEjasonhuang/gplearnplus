@@ -38,6 +38,7 @@ def check_random_state(seed):
     raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
                      ' instance' % seed)
 
+
 # n_jobs转换 -1为全部
 def _get_n_jobs(n_jobs):
     """Get number of jobs for the computation.
@@ -65,6 +66,7 @@ def _get_n_jobs(n_jobs):
         raise ValueError('Parameter n_jobs == 0 has no meaning.')
     else:
         return n_jobs
+
 
 # 将estimator 分配到每一个job上
 # 返回 进程数， 每个进程任务数，累计任务数

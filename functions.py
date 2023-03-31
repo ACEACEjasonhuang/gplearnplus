@@ -14,7 +14,7 @@ from joblib import wrap_non_picklable_objects
 
 NoneType = type(None)
 
-__all__ = ['make_function']
+__all__ = ['make_function', '_function_map', '_Function', 'sig1']
 
 
 class _Function(object):
