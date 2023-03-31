@@ -72,3 +72,10 @@ functions中去掉了对于function.__code__.co_argument的限制
 ## v1.4
 test.py debug
 函数定义考虑特殊参数情况
+
+## v1.5
+新增面板数据支持功能
+将场景分位截面，时序和面板
+数据定义要求更新
+
+函数定义要求更新

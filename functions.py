@@ -14,7 +14,7 @@ from joblib import wrap_non_picklable_objects
 
 NoneType = type(None)
 
-__all__ = ['make_function', '_function_map', '_Function', 'sig1']
+__all__ = ['make_function']
 
 
 class _Function(object):
@@ -34,6 +34,11 @@ class _Function(object):
     arity : int
         The number of arguments that the ``function`` takes.
 
+    param_type : {
+                  'vector': {'category': (None, None), 'number': (None, None)},
+                  'scalar': {'int': (None, None), 'float': (None, None)}
+                  }
+
     """
 
     def __init__(self, function, name, arity, param_type=None):
@@ -41,7 +46,8 @@ class _Function(object):
         self.name = name
         self.arity = arity
         if param_type is None:
-            param_type = arity * [{'vector': (None, None), 'int': (None, None), 'float': (None, None)}]
+            param_type = arity * [{'vector':{'category': (None, None), 'number': (None, None)},
+                                   'scalar': {'int': (None, None), 'float': (None, None)}}]
         self.param_type = param_type
 
     def __call__(self, *args):
@@ -54,10 +60,8 @@ class _Function(object):
             for i, _dict in enumerate(self.param_type):
                 if 'vector' not in _dict:
                     raise ValueError("for None const range, vector type should in all function param")
-                if 'int' in _dict:
-                    self.param_type[i].pop('int')
-                if 'float' in _dict:
-                    self.param_type[i].pop('float')
+                if 'scalar' in _dict:
+                    self.param_type[i].pop('scalar')
             return
         if not isinstance(const_range, tuple):
             raise ValueError('const_range must be an tuple')
@@ -70,41 +74,44 @@ class _Function(object):
             raise ValueError('const_range left should le right')
 
         for i, _dict in enumerate(self.param_type):
-            if 'int' in _dict:
-                _l = int(_min) if _dict['int'][0] is None else int(_dict['int'][0])
-                _r = int(_max) if _dict['int'][1] is None else int(_dict['int'][1])
-                self.param_type[i]['int'] = (_l, _r)
-            if 'float' in _dict:
-                _l = float(_min) if _dict['float'][0] is None else float(_dict['float'][0])
-                _r = float(_max) if _dict['float'][1] is None else float(_dict['float'][1])
-                self.param_type[i]['float'] = (_l, _r)
+            if 'scalar' in _dict:
+                _scalar_range = _dict['scalar']
+                if 'int' in _scalar_range:
+                    _l = int(_min) if _scalar_range['int'][0] is None else int(_scalar_range['int'][0])
+                    _r = int(_max) if _scalar_range['int'][1] is None else int(_scalar_range['int'][1])
+                    self.param_type[i]['scalar']['int'] = (_l, _r)
+                if 'float' in _scalar_range:
+                    _l = float(_min) if _scalar_range['float'][0] is None else float(_scalar_range['float'][0])
+                    _r = float(_max) if _scalar_range['float'][1] is None else float(_scalar_range['float'][1])
+                    self.param_type[i]['scalar']['float'] = (_l, _r)
 
         return
 
-    def is_point_mutation(self, func):
-        if not isinstance(func, _Function):
+    def is_point_mutation(self, candidate_func):
+        # 检验某个待替换函数是否可以替换
+        if not isinstance(candidate_func, _Function):
             raise ValueError("wrong type, it should be _Function style")
-        if len(func.param_type) != len(self.param_type):
+        # 带替换函数是否与该函数参数长度一致
+        if len(candidate_func.param_type) != len(self.param_type):
             return False
 
-        for dict_self, dict_func in zip(self.param_type, func.param_type):
-            if len(dict_func) <= len(dict_self):
+        # candidate函数的参数必须为待替换函数参数的子集
+        for dict_self, dict_candi in zip(self.param_type, candidate_func.param_type):
+            if len(dict_candi) <= len(dict_self):
                 return False
-            for key in dict_self:
-                if key not in dict_func:
+            for upper_type in dict_self:
+                if upper_type not in dict_candi:
                     return False
                 else:
-                    if key != 'vector':
-                        if (dict_func[key][0] >  dict_self[key][0]) or (dict_func[key][1] >  dict_self[key][1]):
+                    for lower_type in dict_self:
+                        if lower_type not in dict_candi[upper_type]:
                             return False
-
+                        else:
+                            if upper_type == 'scalar':
+                                if (dict_candi['scalar'][lower_type][0] > dict_self['scalar'][lower_type][0]) or (
+                                        dict_candi['scalar'][lower_type][1] > dict_candi['scalar'][lower_type][1]):
+                                    return False
         return True
-
-
-
-
-
-
 
 
 # warp 用于多进程序列化，会降低进化效率
@@ -144,19 +151,25 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
         # 转换None type
         non_vector_param = True
         if _dict is None:
-            param_type[i] = {'vector': (None, None), 'int': (None, None), 'float': (None, None)}
+            param_type[i] = {'vector':{'category': (None, None), 'number': (None, None)},
+                             'scalar': {'int': (None, None), 'float': (None, None)}}
         elif not isinstance(_dict, dict):
             raise ValueError('element in param_type must be dict')
-        if len(_dict) > 3:
-            raise ValueError('len of element in param_type must be 1, 2, 3')
-        for _key in _dict:
-            if _key == 'vector':
-                if not isinstance(_dict['vector'], tuple):
-                    raise ValueError('type of element in param_type must be {type: ( , )}}')
-                param_type[i]['vector'] = (None, None)
-                vector_flag = True
-                non_vector_param = False
-            elif _key == 'int':
+        if len(_dict) > 2:
+            raise ValueError('len of element in param_type must be 1, 2')
+        for upper_type in _dict:
+            if upper_type == 'vector':
+                if not isinstance(_dict['vector'], dict):
+                    raise ValueError('type of element in param_type must be {upper_type: {lower_type:( , )}}}')
+                # todo : 继续完成参数检验部分
+                for lower_type in _dict['vector']:
+                    param_type[i]['vector'] = (None, None)
+                    vector_flag = True
+                    non_vector_param = False
+
+
+
+            elif upper_type == 'int':
                 if not isinstance(_dict['int'], tuple):
                     raise ValueError('type of element in param_type must be {type: ( , )}}')
                 if len(_dict['int']) != 2:
@@ -169,7 +182,7 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
                         and _dict['int'][1] < _dict['int'][0]:
                     raise ValueError('dict_second_element should ge dict_first_element')
 
-            elif _key == 'float':
+            elif upper_type == 'float':
                 if not isinstance(_dict['float'], tuple):
                     raise ValueError('type of element in param_type must be {type: ( , )}}')
                 if len(_dict['float']) != 2:
@@ -245,7 +258,6 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
                      name=name,
                      arity=arity,
                      param_type=param_type)
-
 
 
 def _protected_division(x1, x2):
