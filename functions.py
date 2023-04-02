@@ -145,7 +145,6 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
     if len(param_type) != arity:
         raise ValueError('len of param_type must be arity')
 
-
     vector_flag = False
     for i, _dict in enumerate(param_type):
         # 转换None type
@@ -166,8 +165,6 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
                     param_type[i]['vector'] = (None, None)
                     vector_flag = True
                     non_vector_param = False
-
-
 
             elif upper_type == 'int':
                 if not isinstance(_dict['int'], tuple):
