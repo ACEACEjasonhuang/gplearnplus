@@ -57,6 +57,7 @@ def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
     max_samples = int(max_samples * n_samples)
 
     def _tournament():
+        # 从所有父代中随机选择tournament_size个，取其中最优个体子代
         """Find the fittest individual from a sub-population."""
         contenders = random_state.randint(0, len(parents), tournament_size)
         fitness = [parents[p].fitness_ for p in contenders]
@@ -291,6 +292,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             sample_weight = _check_sample_weight(sample_weight, X)
 
         if isinstance(self, ClassifierMixin):
+            # 验证y是否为分类数据， X， y强转ndarray
             X, y = self._validate_data(X, y, y_numeric=False)
             check_classification_targets(y)
 
@@ -311,6 +313,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             self.n_classes_ = len(self.classes_)
 
         else:
+            # 验证y是否为数值数据， X， y强转ndarray
             X, y = self._validate_data(X, y, y_numeric=True)
 
         # check hall_of_fame and n_components ,if have
@@ -342,6 +345,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             else:
                 raise ValueError('invalid type %s found in `function_set`.'
                                  % type(function))
+            # 添加常数范围
             function.add_range(self.const_range)
             self._function_set.append(function)
         if not self._function_set:

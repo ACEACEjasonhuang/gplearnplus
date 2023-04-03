@@ -439,8 +439,8 @@ class _Program(object):
         if program is None:
             program = self.program
         # Choice of crossover points follows Koza's (1992) widely used approach
-        # of choosing functions 90% of the time and leaves 10% of the time.
-        probs = np.array([0.9 if isinstance(node, _Function) else (0.9 if isinstance(node, str) else 0.0)
+        # 90%选到函数，10%选取向量叶子节点
+        probs = np.array([0.9 if isinstance(node, _Function) else (0.1 if isinstance(node, str) else 0.0)
                           for node in program])
         probs = np.cumsum(probs / probs.sum())
         start = np.searchsorted(probs, random_state.uniform())

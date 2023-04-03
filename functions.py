@@ -14,7 +14,7 @@ from joblib import wrap_non_picklable_objects
 
 NoneType = type(None)
 
-__all__ = ['make_function']
+__all__ = ['make_function', 'raw_function_list']
 
 
 class _Function(object):
@@ -41,7 +41,7 @@ class _Function(object):
 
     """
 
-    def __init__(self, function, name, arity, param_type=None):
+    def __init__(self, function, name, arity, param_type=None, return_type='number'):
         self.function = function
         self.name = name
         self.arity = arity
@@ -49,6 +49,9 @@ class _Function(object):
             param_type = arity * [{'vector':{'category': (None, None), 'number': (None, None)},
                                    'scalar': {'int': (None, None), 'float': (None, None)}}]
         self.param_type = param_type
+        if return_type != 'number' or 'category':
+            raise ValueError("return_type of function {} should be number or category, NOT {}".format(name, return_type))
+        self.return_type = return_type
 
     def __call__(self, *args):
         return self.function(*args)
@@ -115,7 +118,7 @@ class _Function(object):
 
 
 # warp 用于多进程序列化，会降低进化效率
-def make_function(*, function, name, arity, param_type=None, wrap=True):
+def make_function(*, function, name, arity, param_type=None, wrap=True, return_type='number'):
     """
        Parameters
        ----------
@@ -125,7 +128,7 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
 
        arity : int
 
-       param_type : [{type: (, ), type: (,)}, ........]
+       param_type : [{type: (, ), type: (, )}, ........]
 
        wrap : bool, optional (default=True)
        """
@@ -137,77 +140,105 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
     if not isinstance(wrap, bool):
         raise ValueError('wrap must be an bool, got %s' % type(wrap))
 
-    # check out param_type vector > int > float
+    # check out param_type vector > scalar int > float
     if param_type is None:
         param_type = [None] * arity
     if not isinstance(param_type, list):
         raise ValueError('param_type must be list')
     if len(param_type) != arity:
         raise ValueError('len of param_type must be arity')
-
+    # 保证函数中至少有一个向量
     vector_flag = False
     for i, _dict in enumerate(param_type):
         # 转换None type
+        # 标记某一个参数是否可接受向量
         non_vector_param = True
         if _dict is None:
-            param_type[i] = {'vector':{'category': (None, None), 'number': (None, None)},
+            param_type[i] = {'vector': {'category': (None, None), 'number': (None, None)},
                              'scalar': {'int': (None, None), 'float': (None, None)}}
         elif not isinstance(_dict, dict):
-            raise ValueError('element in param_type must be dict')
+            raise ValueError('element in param_type {} must be dict'.format(i + 1))
         if len(_dict) > 2:
-            raise ValueError('len of element in param_type must be 1, 2')
+            raise ValueError('len of element in param_type {} must be 1, 2'.format(i + 1))
         for upper_type in _dict:
             if upper_type == 'vector':
                 if not isinstance(_dict['vector'], dict):
-                    raise ValueError('type of element in param_type must be {upper_type: {lower_type:( , )}}}')
-                # todo : 继续完成参数检验部分
+                    raise ValueError('type of element in param_type {} must be {upper_type: {lower_type:( , )}}}'
+                                     .format(i + 1))
+                if len(_dict['vector']) == 0:
+                    raise ValueError('length of upper_type dict in param_type {} should not be 0'.format(i + 1))
+                vector_flag = True
+                non_vector_param = False
                 for lower_type in _dict['vector']:
-                    param_type[i]['vector'] = (None, None)
-                    vector_flag = True
-                    non_vector_param = False
+                    if lower_type not in ['number', 'category']:
+                        raise ValueError('key of vector in param_type {} must be number or category'.format(i + 1))
+                    param_type[i]['vector'][lower_type] = (None, None)
 
-            elif upper_type == 'int':
-                if not isinstance(_dict['int'], tuple):
-                    raise ValueError('type of element in param_type must be {type: ( , )}}')
-                if len(_dict['int']) != 2:
-                    raise ValueError('len of dict_element in param_type must be 2')
-                if not isinstance(_dict['int'][0], (int, NoneType)):
-                    raise ValueError('type of dict_first_element in param_type must be None, int or float')
-                if not isinstance(_dict['int'][1], (int, NoneType)):
-                    raise ValueError('type of dict_second_element in param_type must be None, int or float')
-                if isinstance(_dict['int'][0], int) and isinstance(_dict['int'][1], int) \
-                        and _dict['int'][1] < _dict['int'][0]:
-                    raise ValueError('dict_second_element should ge dict_first_element')
+            elif upper_type == 'scalar':
+                if not isinstance(_dict['scalar'], dict):
+                    raise ValueError('type of element in param_type {} must be {upper_type: {lower_type:( , )}}}'
+                                     .format(i + 1))
+                if len(_dict['scalar']) == 0:
+                    raise ValueError('length of upper_type dict in param_type {} should not be 0'.format(i + 1))
+                for lower_type in _dict['scalar']:
+                    if lower_type == 'int':
+                        if not isinstance(_dict['scalar']['int'], tuple):
+                            raise ValueError('structure of lower_type in param_type {} must be {type: ( , )}}'
+                                             .format(i + 1))
+                        if len(_dict['scalar']['int']) != 2:
+                            raise ValueError("len of lower_type's structure in param_type {} must be 2".format(i + 1))
+                        if not isinstance(_dict['scalar']['int'][0], (int, NoneType)):
+                            raise ValueError("the first element in lower_type's structure in param_type {} "
+                                             "must be None, int or float".format(i + 1))
+                        if not isinstance(_dict['scalar']['int'][1], (int, NoneType)):
+                            raise ValueError("the second element in lower_type's structure in param_type {} "
+                                             "must be None, int or float".format(i + 1))
+                        if isinstance(_dict['scalar']['int'][0], int) and isinstance(_dict['scalar']['int'][1], int) \
+                                and _dict['scalar']['int'][1] < _dict['scalar']['int'][0]:
+                            raise ValueError('the second element should ge the first element in param_type {}'
+                                             .format(i + 1))
 
-            elif upper_type == 'float':
-                if not isinstance(_dict['float'], tuple):
-                    raise ValueError('type of element in param_type must be {type: ( , )}}')
-                if len(_dict['float']) != 2:
-                    raise ValueError('len of dict_element in param_type must be 2')
-                if not isinstance(_dict['float'][0], (float, int, NoneType)):
-                    raise ValueError('type of dict_first_element in param_type must be None, int or float')
-                if not isinstance(_dict['float'][1], (float, int, NoneType)):
-                    raise ValueError('type of dict_second_element in param_type must be None, int or float')
-                if isinstance(_dict['float'][0], (int, float)) and isinstance(_dict['float'][1], (int, float)) \
-                        and _dict['float'][1] < _dict['float'][0]:
-                    raise ValueError('dict_second_element should ge dict_first_element')
+                    elif lower_type == 'float':
+                        if not isinstance(_dict['scalar']['float'], tuple):
+                            raise ValueError('structure of lower_type in param_type {} must be {type: ( , )}}'
+                                             .format(i + 1))
+                        if len(_dict['scalar']['float']) != 2:
+                            raise ValueError("len of lower_type's structure in param_type {} must be 2".format(i + 1))
+                        if not isinstance(_dict['scalar']['float'][0], (float, int, NoneType)):
+                            raise ValueError("the first element in lower_type's structure in param_type {} "
+                                             "must be None, int or float".format(i + 1))
+                        if not isinstance(_dict['scalar']['float'][1], (float, int, NoneType)):
+                            raise ValueError("the second element in lower_type's structure in param_type {} "
+                                             "must be None, int or float".format(i + 1))
+                        if isinstance(_dict['scalar']['float'][0], (int, float)) and \
+                                isinstance(_dict['scalar']['float'][1], (int, float)) \
+                                and _dict['scalar']['float'][1] < _dict['scalar']['float'][0]:
+                            raise ValueError('the second element should ge the first element in param_type {}'
+                                             .format(i + 1))
+                    else:
+                        raise ValueError('key of scalar in param_type {} must be int or float'.format(i + 1))
             else:
-                raise ValueError('key of element in param_type must be vector, int or float')
+                raise ValueError('key of element in param_type {} must be vector or scalar'.format(i + 1))
 
     if not vector_flag:
-        raise ValueError('there is at least  1 vector in param_type')
+        raise ValueError('there is at least 1 vector in param_type {}'.format(i + 1))
 
     # Check output shape
+    # 生成测试数据
     args = []
     for _dict in param_type:
         if 'vector' in _dict:
-            args.append(np.ones(10))
-        elif 'int' in _dict:
-            args.append(((0 if _dict['int'][1] is None else _dict['int'][1]) +
-                         (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
-        else:
-            args.append(((0 if _dict['float'][1] is None else _dict['float'][1]) +
-                         (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
+            if 'number' in _dict['vector']:
+                args.append(np.ones(10))
+            else:
+                args.append(np.array(['a'] * 10))
+        elif 'scalar' in _dict:
+            if 'int' in _dict['scalar']:
+                args.append(((0 if _dict['scalar']['int'][1] is None else _dict['scalar']['int'][1]) +
+                             (0 if _dict['scalar']['int'][0] is None else _dict['scalar']['int'][0])) // 2)
+            else:
+                args.append(((0 if _dict['scalar']['float'][1] is None else _dict['scalar']['float'][1]) +
+                             (0 if _dict['scalar']['float'][0] is None else _dict['scalar']['float'][0])) // 2)
 
     try:
         function(*args)
@@ -220,7 +251,12 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
     if function(*args).shape != (10,):
         raise ValueError('supplied function %s does not return same shape as '
                          'input vectors.' % name)
+    if function(*args).dtype.type is np.int_ or np.float_ and self.return_type == 'category':
+        raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
+    elif function(*args).dtype.type is not (np.int_ or np.float_) and self.return_type == 'number':
+        raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
 
+    # todo: 继续修改函数参数检验，并加入分类参数，函数检验
     # Check closure for zero & negative input arguments
     args2 = []
     args3 = []
@@ -250,11 +286,13 @@ def make_function(*, function, name, arity, param_type=None, wrap=True):
         return _Function(function=wrap_non_picklable_objects(function),
                          name=name,
                          arity=arity,
-                         param_type=param_type)
+                         param_type=param_type,
+                         return_type=return_type)
     return _Function(function=function,
                      name=name,
                      arity=arity,
-                     param_type=param_type)
+                     param_type=param_type,
+                     return_type=return_type)
 
 
 def _protected_division(x1, x2):
@@ -316,6 +354,10 @@ _function_map = {'add': add2,
                  'sin': sin1,
                  'cos': cos1,
                  'tan': tan1}
+
+raw_function_list = ['add', 'sub', 'mul', 'div', 'sqrt',
+                     'sqrt', 'log', 'abs', 'neg', 'inv',
+                     'max', 'min', 'sin', 'cos', 'tan']
 
 
 if __name__ == '__main__':
