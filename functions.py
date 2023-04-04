@@ -256,7 +256,6 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
     elif function(*args).dtype.type is not (np.int_ or np.float_) and self.return_type == 'number':
         raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
 
-    # todo: 继续修改函数参数检验，并加入分类参数，函数检验
     # Check closure for zero & negative input arguments
     args2 = []
     args3 = []
@@ -264,16 +263,17 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
         if 'vector' in _dict:
             args2.append(np.zeros(10))
             args3.append(-1 * np.ones(10))
-        elif 'int' in _dict:
-            _temp = (((0 if _dict['int'][1] is None else _dict['int'][1]) +
-                      (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
-            args2.append(_temp)
-            args3.append(_temp)
-        else:
-            _temp = (((0 if _dict['float'][1] is None else _dict['float'][1]) +
-                      (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
-            args2.append(_temp)
-            args3.append(_temp)
+        elif 'scalar' in _dict:
+            if 'int' in _dict['scalar']:
+                _temp = (((0 if _dict['int'][1] is None else _dict['int'][1]) +
+                          (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
+                args2.append(_temp)
+                args3.append(_temp)
+            else:
+                _temp = (((0 if _dict['float'][1] is None else _dict['float'][1]) +
+                          (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
+                args2.append(_temp)
+                args3.append(_temp)
 
     if not np.all(np.isnan(function(*args2)) | np.isfinite(function(*args2))):
         raise ValueError('supplied function %s does not have closure against '
@@ -359,6 +359,11 @@ raw_function_list = ['add', 'sub', 'mul', 'div', 'sqrt',
                      'sqrt', 'log', 'abs', 'neg', 'inv',
                      'max', 'min', 'sin', 'cos', 'tan']
 
+all_function = raw_function_list.copy()
+
+section_function = []
+
+time_series_function = []
 
 if __name__ == '__main__':
     def ff(a, b, c):

@@ -16,6 +16,7 @@ from warnings import warn
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import rankdata
 from sklearn.base import BaseEstimator
@@ -24,6 +25,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.utils import compute_sample_weight
 from sklearn.utils.validation import check_array, _check_sample_weight
 from sklearn.utils.multiclass import check_classification_targets
+from sklearn.preprocessing import LabelEncoder
 
 from ._program import _Program
 from .fitness import _fitness_map, _Fitness
@@ -35,8 +37,9 @@ __all__ = ['SymbolicRegressor', 'SymbolicClassifier', 'SymbolicTransformer']
 
 MAX_INT = np.iinfo(np.int32).max
 
+# todo 继续修改不同参数的逻辑
 # 并行实现子树交叉，变异
-def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
+def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data, sample_weight, seeds, params):
     """Private function used to build a batch of programs within a job."""
     n_samples, n_features = X.shape
     # Unpack parameters
@@ -50,6 +53,7 @@ def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
     transformer = params['_transformer']
     parsimony_coefficient = params['parsimony_coefficient']
     method_probs = params['method_probs']
+    data_type = params['data_type']
     p_point_replace = params['p_point_replace']
     max_samples = params['max_samples']
     feature_names = params['feature_names']
@@ -126,6 +130,7 @@ def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
                            const_range=const_range,
                            p_point_replace=p_point_replace,
                            parsimony_coefficient=parsimony_coefficient,
+                           data_type=date_type,
                            feature_names=feature_names,
                            random_state=random_state,
                            program=program)
@@ -189,10 +194,14 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                  max_samples=1.0,
                  class_weight=None,
                  feature_names=None,
+                 time_series_index=None,
+                 security_index=None,
+                 category_features=None,
                  warm_start=False,
                  low_memory=False,
                  n_jobs=1,
                  verbose=0,
+                 data_type='section',
                  random_state=None):
 
         self.population_size = population_size
@@ -216,13 +225,17 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         self.max_samples = max_samples
         self.class_weight = class_weight
         self.feature_names = feature_names
+        self.category_features = category_features
+        self.time_series_index = time_series_index
+        self.security_index = security_index
         self.warm_start = warm_start
         self.low_memory = low_memory
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.random_state = random_state
+        self.data_type = data_type
 
-    # 打印
+    # 打印训练日志
     def _verbose_reporter(self, run_details=None):
         """A report of the progress of the evolution process.
 
@@ -264,6 +277,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                                      oob_fitness,
                                      remaining_time))
 
+    # fit 的时候考虑时序问题
     def fit(self, X, y, sample_weight=None):
         """Fit the Genetic Program according to X, y.
 
@@ -287,12 +301,114 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         """
         random_state = check_random_state(self.random_state)
 
+        # 检查数据类型
+        if self.data_type not in ('section', 'time_series', 'panel'):
+            raise ValueError('Valid data_type methods include '
+                             '"section", "time_series" and "panel". Given %s.'
+                             % self.data_type)
+
+        # 检查数据结构
+        # 若含有security或者timeindex 必须时DataFrame
+        if self.security_index is not None or self.time_series_index is not None:
+            if not isinstance(X, pd.DataFrame):
+                raise ValueError('with security ot time index, data structure should be DataFrame')
+
+        # 检查时间index和个股index， 对于截面，时序和面板数据分别检查
+        security_data = None
+        time_series_data = None
+        if self.data_type == 'section':
+            if self.time_series_index is not None:
+                raise ValueError('For Section Data, time_series_index should be None')
+            if self.security_index is not None:
+                # 在index和columns中寻找security_index
+                if self.security_index not in X.columns and self.security_index not in X.index.name:
+                    raise ValueError('Can not fund security_index {} in both columns and index'
+                                     .format(self.security_index))
+                elif self.security_index in X.columns:
+                    X.set_index(self.security_index, inplace=True)
+
+                # 判断是否有重复个股
+                if len(X[self.security_index].unique()) < len(X[self.security_index]):
+                    raise ValueError('For Section Data, security data should be unique')
+
+                security_data = X.index.values
+
+        elif self.data_type == 'time_series':
+            if self.time_series_index is None:
+                raise ValueError('For time_series Data, time_series_index should NOT be None')
+            if self.security_index is not None:
+                raise ValueError('For time_series Data, security_index should be None')
+            if self.time_series_index not in X.columns and self.time_series_index not in X.index.name:
+                raise ValueError('Can not fund time_series_index {} in both columns and index'
+                                 .format(self.time_series_index))
+            elif self.time_series_index in X.columns:
+                X.set_index(self.time_series_index, inplace=True)
+
+            # 判断是否有重复时间
+            if len(X[self.time_series_index].unique()) < len(X[self.time_series_index]):
+                raise ValueError('For time_series Data, time_series data should be unique')
+
+            X_combine = X.copy()
+            X_combine['_label'] = y
+            X_combine.sort_index(inplace=True)
+            X, y = X_combine.loc[:, self.feature_names], X_combine.loc[:, '_label']
+            time_series_data = X.index.values
+
+        else:
+            if self.time_series_index is None:
+                raise ValueError('For panel Data, time_series_index should NOT be None')
+            if self.security_index is None:
+                raise ValueError('For panel Data, security_index should NOT be None')
+
+            # security time_series 进入index
+            if self.time_series_index not in X.columns and self.time_series_index not in X.index.name:
+                raise ValueError('Can not fund time_series_index {} in both columns and index'
+                                 .format(self.time_series_index))
+            elif self.security_index not in X.columns and self.security_index not in X.index.name:
+                raise ValueError('Can not fund security_index {} in both columns and index'
+                                 .format(self.security_index))
+            elif self.time_series_index in X.columns and self.security_index in X.columns:
+                X.set_index([self.time_series_index, self.security_index], inplace=True)
+            elif self.time_series_index in X.columns:
+                X.set_index(self.security_index, inplace=True, append=True)
+            elif self.security_index in X.columns:
+                X.set_index(self.time_series_index, inplace=True, append=True)
+
+            # 判断没有重复
+            if len(X.index) != len(X.index.drop_duplicates()):
+                raise ValueError('For time_series Data, time_series data should be unique')
+
+
+            X_combine = X.copy()
+            X_combine['_label'] = y
+            X_combine.sort_index(inplace=True)
+            X, y = X_combine.loc[:, self.feature_names], X_combine.loc[:, '_label']
+            time_series_data = X.index.get_level_values(self.time_series_index).values
+            security_data = X.index.get_level_values(self.security_index).values
+
+
+        # 检查category_features是否与全包含在feature_names中
+        # 当存在分类数据时，输入数据类型必须为pd。DataFrame
+        if self.category_features is not None:
+            if not isinstance(X, pd.DataFrame):
+                raise ValueError('while there are category_features in X, X must be pd.DataFrame')
+            if not isinstance(self.category_features, list):
+                raise ValueError('category_features must be list')
+            for cat_feature in self.category_features:
+                if cat_feature not in self.feature_names:
+                    raise ValueError('Valid category_feature {} , not in feature_names'.format(cat_feature))
+            # 处理分类数据，转换为整型
+            label_encoder = LabelEncoder()
+            X[self.category_features] = X[self.category_features].apply(label_encoder.fit_transform)
+
         # Check arrays
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
 
+        # 检查数据内容
         if isinstance(self, ClassifierMixin):
             # 验证y是否为分类数据， X， y强转ndarray
+            # todo 分类场景的处理有待优化，暂时不处理
             X, y = self._validate_data(X, y, y_numeric=False)
             check_classification_targets(y)
 
@@ -332,6 +448,24 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                              'hall_of_fame (%d).' % (self.n_components,
                                                      self.hall_of_fame))
 
+        # 检查feature_names是否与n_features_in_一致
+        if self.feature_names is not None:
+            if self.n_features_in_ != len(self.feature_names):
+                raise ValueError('The supplied `feature_names` has different '
+                                 'length to n_features. Expected %d, got %d.'
+                                 % (self.n_features_in_,
+                                    len(self.feature_names)))
+            for feature_name in self.feature_names:
+                if not isinstance(feature_name, str):
+                    raise ValueError('invalid type %s found in '
+                                     '`feature_names`.' % type(feature_name))
+
+        # 检查const_range
+        if not ((isinstance(self.const_range, tuple) and
+                 len(self.const_range) == 2) or self.const_range is None):
+            raise ValueError('const_range should be a tuple with length two, '
+                             'or None.')
+
         # 检查function, 稍作修改， 结合const_range到range里面
         self._function_set = []
         for function in self.function_set:
@@ -351,7 +485,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         if not self._function_set:
             raise ValueError('No valid functions found in `function_set`.')
 
-        # 点变异记录函数参数个数， 需要再点变异中再考察参数类型
+        # 点变异记录函数参数个数， 需要在点变异中再考察参数类型
         self._arities = {}
         for function in self._function_set:
             arity = function.arity
@@ -376,6 +510,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             self._metric = _fitness_map[self.metric]
 
         # 检查概率参数
+        # todo 增加交叉变异方法后需要修改此处
         self._method_probs = np.array([self.p_crossover,
                                        self.p_subtree_mutation,
                                        self.p_hoist_mutation,
@@ -392,12 +527,6 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                              '"grow", "full" and "half and half". Given %s.'
                              % self.init_method)
 
-        # 检查const_range
-        if not((isinstance(self.const_range, tuple) and
-                len(self.const_range) == 2) or self.const_range is None):
-            raise ValueError('const_range should be a tuple with length two, '
-                             'or None.')
-
         # 检查初始化深度
         if (not isinstance(self.init_depth, tuple) or
                 len(self.init_depth) != 2):
@@ -405,18 +534,6 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         if self.init_depth[0] > self.init_depth[1]:
             raise ValueError('init_depth should be in increasing numerical '
                              'order: (min_depth, max_depth).')
-
-        # 检查feature_names是否与n_features_in_一致
-        if self.feature_names is not None:
-            if self.n_features_in_ != len(self.feature_names):
-                raise ValueError('The supplied `feature_names` has different '
-                                 'length to n_features. Expected %d, got %d.'
-                                 % (self.n_features_in_,
-                                    len(self.feature_names)))
-            for feature_name in self.feature_names:
-                if not isinstance(feature_name, str):
-                    raise ValueError('invalid type %s found in '
-                                     '`feature_names`.' % type(feature_name))
 
         # 初始化transformer函数
         if self.transformer is not None:
@@ -500,6 +617,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                                           parents,
                                           X,
                                           y,
+                                          security_data,
+                                          time_series_data,
                                           sample_weight,
                                           seeds[starts[i]:starts[i + 1]],
                                           params)
@@ -512,7 +631,6 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             length = [program.length_ for program in population]
 
             # 惩罚系数
-
             parsimony_coefficient = None
             if self.parsimony_coefficient == 'auto':
                 parsimony_coefficient = (np.cov(length, fitness)[1, 0] /
@@ -570,6 +688,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 if best_fitness <= self.stopping_criteria:
                     break
 
+        # 特征工程专属模块
         if isinstance(self, TransformerMixin):
             # Find the best individuals in the final generation
             fitness = np.array(fitness)
@@ -592,6 +711,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             # Iteratively remove least fit individual of most correlated pair
             while len(components) > self.n_components:
                 # 去除hall_of_fame - n_components个高度相关特征
+                # 找到相关系数矩阵中相关系数绝对值最大的两个特征，删去其中fitness较低的那个
                 most_correlated = np.unravel_index(np.argmax(correlations),
                                                    correlations.shape)
                 # The correlation matrix is sorted by fitness, so identifying

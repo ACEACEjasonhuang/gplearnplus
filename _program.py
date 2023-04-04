@@ -36,6 +36,7 @@ class _Program(object):
                  p_point_replace,
                  parsimony_coefficient,
                  random_state,
+                 data_type,
                  transformer=None,
                  feature_names=None,
                  program=None):
@@ -49,6 +50,7 @@ class _Program(object):
         self.metric = metric
         self.p_point_replace = p_point_replace
         self.parsimony_coefficient = parsimony_coefficient
+        self.data_type = data_type
         self.transformer = transformer
         self.feature_names = feature_names
         self.program = program
