@@ -398,6 +398,7 @@ class _Program(object):
 
         return raw_fitness
 
+    # todo 引入非线性适应度
     # 惩罚后适应度 对函数长度进行惩罚
     def fitness(self, parsimony_coefficient=None):
         """Evaluate the penalized fitness of the program according to X, y.

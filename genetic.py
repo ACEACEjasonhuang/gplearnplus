@@ -57,6 +57,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     p_point_replace = params['p_point_replace']
     max_samples = params['max_samples']
     feature_names = params['feature_names']
+    data_type = params['data_type']
 
     max_samples = int(max_samples * n_samples)
 
@@ -709,6 +710,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             components = list(range(self.hall_of_fame))
             indices = list(range(self.hall_of_fame))
             # Iteratively remove least fit individual of most correlated pair
+            # todo 加入相关性阈值，相关性低于某一阈值时按照ftness筛选
+            # todo 引入非线性信息
             while len(components) > self.n_components:
                 # 去除hall_of_fame - n_components个高度相关特征
                 # 找到相关系数矩阵中相关系数绝对值最大的两个特征，删去其中fitness较低的那个
