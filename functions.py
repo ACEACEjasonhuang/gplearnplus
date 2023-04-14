@@ -38,27 +38,30 @@ class _Function(object):
                   'vector': {'category': (None, None), 'number': (None, None)},
                   'scalar': {'int': (None, None), 'float': (None, None)}
                   }
+    function_type : 'all', 'section', 'time_series
 
     """
 
-    def __init__(self, function, name, arity, param_type=None, return_type='number'):
+    def __init__(self, function, name, arity, param_type=None, return_type='number', function_type='all'):
         self.function = function
         self.name = name
         self.arity = arity
         if param_type is None:
-            param_type = arity * [{'vector':{'category': (None, None), 'number': (None, None)},
+            # 默认不接受分类类型
+            param_type = arity * [{'vector':{'number': (None, None)},
                                    'scalar': {'int': (None, None), 'float': (None, None)}}]
         self.param_type = param_type
-        if return_type != 'number' or 'category':
+        if (return_type != 'number') and (return_type != 'category'):
             raise ValueError("return_type of function {} should be number or category, NOT {}".format(name, return_type))
         self.return_type = return_type
+        self.function_type = function_type
 
     def __call__(self, *args):
         return self.function(*args)
 
     def add_range(self, const_range):
         # 替换掉参数中没有约束的范围
-        # 去掉所有的const type
+        # 若没有const_range, 则表明所有函数不接收常数， 去掉所有的const type
         if const_range is None:
             for i, _dict in enumerate(self.param_type):
                 if 'vector' not in _dict:
@@ -251,9 +254,9 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
     if function(*args).shape != (10,):
         raise ValueError('supplied function %s does not return same shape as '
                          'input vectors.' % name)
-    if function(*args).dtype.type is np.int_ or np.float_ and self.return_type == 'category':
+    if function(*args).dtype.type is np.int_ or np.float_ and return_type == 'category':
         raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
-    elif function(*args).dtype.type is not (np.int_ or np.float_) and self.return_type == 'number':
+    elif function(*args).dtype.type is not (np.int_ and np.float_) and return_type == 'number':
         raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
 
     # Check closure for zero & negative input arguments
@@ -266,13 +269,14 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
             args3.append(-1 * np.ones(10))
         elif 'scalar' in _dict:
             if 'int' in _dict['scalar']:
-                _temp = (((0 if _dict['int'][1] is None else _dict['int'][1]) +
-                          (0 if _dict['int'][0] is None else _dict['int'][0])) // 2)
+
+                _temp = (((0 if _dict['scalar']['int'][1] is None else _dict['scalar']['int'][1]) +
+                          (0 if _dict['scalar']['int'][0] is None else _dict['scalar']['int'][0])) // 2)
                 args2.append(_temp)
                 args3.append(_temp)
             else:
-                _temp = (((0 if _dict['float'][1] is None else _dict['float'][1]) +
-                          (0 if _dict['float'][0] is None else _dict['float'][0])) // 2)
+                _temp = (((0 if _dict['scalar']['float'][1] is None else _dict['scalar']['float'][1]) +
+                          (0 if _dict['scalar']['float'][0] is None else _dict['scalar']['float'][0])) // 2)
                 args2.append(_temp)
                 args3.append(_temp)
 
@@ -371,8 +375,8 @@ if __name__ == '__main__':
     def ff(a, b, c):
         return a * b + c
 
-    param_type = [{'vector':(None, None)}, {'int':(None, 1)}, {'float': (-1, None)}]
-    f_m = make_function(function=ff, name='ff', arity=3, param_type=param_type, wrap=True)
+    param_type = [{'vector':{'number': (None, None)}}, {'scalar': {'int':(None, 1)}}, {'scalar': {'float': (-1, None)}}]
+    f_m = make_function(function=ff, name='ff', arity=3, param_type=param_type, wrap=True, return_type='number')
     f_m.add_range((-1, 1))
     print(f_m.param_type)
 

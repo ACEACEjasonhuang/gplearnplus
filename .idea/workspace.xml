@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="da5529ee-c57f-4dbd-9e78-20f9ddf31530" name="Default Changelist" comment="v1.51 （未完成，有todo不可使用）">
+    <list default="true" id="da5529ee-c57f-4dbd-9e78-20f9ddf31530" name="Default Changelist" comment="v1.55 （未完成，有todo不可使用）">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/_program.py" beforeDir="false" afterPath="$PROJECT_DIR$/_program.py" afterDir="false" />
@@ -45,14 +45,14 @@
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/software/python38/Lib/site-packages/gplearnplus&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/hjz/project/research_demo&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.sourceCode.Python&quot;
   }
 }</component>
-  <component name="RunManager" selected="Python.test">
+  <component name="RunManager" selected="Python.functions (1)">
     <configuration name="functions (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="gplearnplus" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -187,9 +187,9 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.functions (1)" />
         <item itemvalue="Python.test" />
         <item itemvalue="Python.genetic" />
-        <item itemvalue="Python.functions (1)" />
         <item itemvalue="Python.functions" />
         <item itemvalue="Python.utils" />
       </list>
@@ -213,7 +213,13 @@
       <workItem from="1680227579667" duration="10937000" />
       <workItem from="1680506238492" duration="7698000" />
       <workItem from="1680570845017" duration="6818000" />
-      <workItem from="1680584852150" duration="12970000" />
+      <workItem from="1680584852150" duration="17444000" />
+      <workItem from="1680748457626" duration="450000" />
+      <workItem from="1680748923170" duration="1347000" />
+      <workItem from="1680755836291" duration="39000" />
+      <workItem from="1680755886556" duration="3236000" />
+      <workItem from="1681089314279" duration="1186000" />
+      <workItem from="1681363057918" duration="14776000" />
     </task>
     <task id="LOCAL-00001" summary="v1.4">
       <created>1680227722018</created>
@@ -222,7 +228,21 @@
       <option name="project" value="LOCAL" />
       <updated>1680227722018</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="v1.53 （未完成，有todo不可使用）">
+      <created>1680603735322</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1680603735322</updated>
+    </task>
+    <task id="LOCAL-00003" summary="v1.55 （未完成，有todo不可使用）">
+      <created>1680775226047</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1680775226047</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -241,7 +261,9 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="v1.4" />
-    <option name="LAST_COMMIT_MESSAGE" value="v1.4" />
+    <MESSAGE value="v1.53 （未完成，有todo不可使用）" />
+    <MESSAGE value="v1.55 （未完成，有todo不可使用）" />
+    <option name="LAST_COMMIT_MESSAGE" value="v1.55 （未完成，有todo不可使用）" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -255,7 +277,7 @@
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/gplearnplus$functions__1_.coverage" NAME="functions (1) Coverage Results" MODIFIED="1670189955365" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/gplearnplus$functions__1_.coverage" NAME="functions (1) Coverage Results" MODIFIED="1681450960829" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/gplearnplus$utils.coverage" NAME="utils Coverage Results" MODIFIED="1669873168115" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/gplearnplus$test.coverage" NAME="test Coverage Results" MODIFIED="1670868404326" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/gplearnplus$function.coverage" NAME="function Coverage Results" MODIFIED="1669881466474" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

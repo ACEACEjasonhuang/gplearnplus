@@ -26,7 +26,7 @@ class _Program(object):
     """
 
     def __init__(self,
-                 function_set,
+                 function_dict,
                  arities,
                  init_depth,
                  init_method,
@@ -41,7 +41,7 @@ class _Program(object):
                  feature_names=None,
                  program=None):
 
-        self.function_set = function_set
+        self.function_dict = function_dict
         self.arities = arities
         self.init_depth = (init_depth[0], init_depth[1] + 1)
         self.init_method = init_method
@@ -54,6 +54,9 @@ class _Program(object):
         self.transformer = transformer
         self.feature_names = feature_names
         self.program = program
+
+        self.num_func_number = self.function_dict['number']
+        self.cat_func_number = self.function_dict['category']
 
         if self.program is not None:
             if not self.validate_program():
@@ -72,6 +75,7 @@ class _Program(object):
     def build_program(self, random_state):
         """
         参数中无program 初始化方法
+        # v1.55 修改数的生成逻辑
         :param random_state: RandomState 对象， 随机数生成器
         :return: list,
         """
@@ -82,14 +86,16 @@ class _Program(object):
         max_depth = random_state.randint(*self.init_depth)
 
         # Start a program with a function to avoid degenerative programs
-        function = random_state.randint(len(self.function_set))
-        function = self.function_set[function]
+        # 因子返回类型必须为数值类型
+        function = random_state.randint(len(self.function_dict['number']))
+        function = self.function_dict['number'][function]
+
         program = [function]
         terminal_stack = [deepcopy(function.param_type)]
 
         while terminal_stack:
             depth = len(terminal_stack)
-            choice = self.n_features + len(self.function_set)
+            choice = self.n_features + self.num_func_number + self.cat_func_number
             choice = random_state.randint(choice)
             # Determine if we are adding a function or terminal
             if not isinstance(terminal_stack[-1], list):
@@ -97,11 +103,16 @@ class _Program(object):
             if not isinstance(terminal_stack[-1][0], dict):
                 raise ValueError("element in terminal_stack'element should be dict")
             # 插入函数的情况
-            if ('vector' in terminal_stack[-1][0]) and (depth < max_depth) and (method == 'full' or
-                                                                                 choice <= len(self.function_set)):
+            if ('vector' in terminal_stack[-1][0]) and (depth < max_depth) \
+                    and (method == 'full' or choice <= (self.num_func_number + self.cat_func_number)):
                 # 必须可接收向量且深度未满
-                function = random_state.randint(len(self.function_set))
-                function = self.function_set[function]
+                _choice = random_state.randint(self.cat_func_number + self.num_func_number)
+                if 'number' in terminal_stack[-1][0]['vector'] and 'category' in terminal_stack[-1][0]['vector']:
+                    key = 'number' if _choice < self.num_func_number else 'category'
+                else:
+                    key = 'number' if 'number' in terminal_stack[-1][0]['vector'] else 'category'
+                function = self.function_dict[key][_choice %
+                                                   (self.num_func_number if key == 'number' else self.cat_func_number)]
                 program.append(function)
                 terminal_stack.append(deepcopy(function.param_type))
             else:
@@ -111,6 +122,14 @@ class _Program(object):
                         (('int' or 'float') not in terminal_stack[-1][0]):
                     if 'vector' not in terminal_stack[-1][0]:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
+                    ## 根据参数要求插入分类或者数值型向量
+
+
+                    ## 特殊情况，若X中没有分类型向量，但需要分类型向量，则插入分类函数
+
+
+
+
                     terminal = random_state.randint(self.n_features)
                     program.append(str(terminal))
                 elif ('vector' not in terminal_stack[-1][0]) or (terminal == self.n_features):

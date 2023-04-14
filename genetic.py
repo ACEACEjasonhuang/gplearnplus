@@ -40,6 +40,25 @@ MAX_INT = np.iinfo(np.int32).max
 # todo 继续修改不同参数的逻辑
 # 并行实现子树交叉，变异
 def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data, sample_weight, seeds, params):
+    """
+
+    Parameters
+    ----------
+    n_programs: 遗传代数
+    parents：父辈个体集合
+    X：原始特征
+    y：预测label
+    security_data：个体标记， 时序数据为none
+    time_series_data：时间标记， 界面数据为none
+    sample_weight：抽样比例
+    seeds：随机种子
+    params：参数
+
+    Returns
+    -------
+
+    """
+
     """Private function used to build a batch of programs within a job."""
     n_samples, n_features = X.shape
     # Unpack parameters
@@ -309,7 +328,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                              % self.data_type)
 
         # 检查数据结构
-        # 若含有security或者timeindex 必须时DataFrame
+        # 若含有security或者timeindex 必须为DataFrame
         if self.security_index is not None or self.time_series_index is not None:
             if not isinstance(X, pd.DataFrame):
                 raise ValueError('with security ot time index, data structure should be DataFrame')
@@ -387,7 +406,6 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             time_series_data = X.index.get_level_values(self.time_series_index).values
             security_data = X.index.get_level_values(self.security_index).values
 
-
         # 检查category_features是否与全包含在feature_names中
         # 当存在分类数据时，输入数据类型必须为pd。DataFrame
         if self.category_features is not None:
@@ -401,6 +419,10 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             # 处理分类数据，转换为整型
             label_encoder = LabelEncoder()
             X[self.category_features] = X[self.category_features].apply(label_encoder.fit_transform)
+            # 重构顺序，将分类类型放在前面
+            self.feature_names = \
+                [self.category_features + [_col for _col in self.feature_names if _col not in self.category_features]]
+            X = X[self.feature_names]
 
         # Check arrays
         if sample_weight is not None:
@@ -467,31 +489,40 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             raise ValueError('const_range should be a tuple with length two, '
                              'or None.')
 
-        # 检查function, 稍作修改， 结合const_range到range里面
-        self._function_set = []
+        # 检查function, 稍作修改， 结合const_range到range里面, 并区分number func 和 cat function
+        # 存放不同类型的函数（分类和数值）
+        self._function_dict = {'number': [], 'category': []}
         for function in self.function_set:
+            # 类型检验
             if isinstance(function, str):
                 if function not in _function_map:
                     raise ValueError('invalid function name %s found in '
                                      '`function_set`.' % function)
                 function = deepcopy(_function_map[function])
+                self._function_dict['number'].append(function)
             elif isinstance(function, _Function):
                 function = deepcopy(function)
+                # 添加常数范围
+                function.add_range(self.const_range)
+                if function.return_type == 'number':
+                    self._function_dict['number'].append(function)
+                else:
+                    self._function_dict['category'].append(function)
             else:
                 raise ValueError('invalid type %s found in `function_set`.'
                                  % type(function))
-            # 添加常数范围
-            function.add_range(self.const_range)
-            self._function_set.append(function)
-        if not self._function_set:
+
+        # number类型函数必须有
+        if len(self._function_dict['number']) == 0:
             raise ValueError('No valid functions found in `function_set`.')
 
         # 点变异记录函数参数个数， 需要在点变异中再考察参数类型
-        self._arities = {}
-        for function in self._function_set:
-            arity = function.arity
-            self._arities[arity] = self._arities.get(arity, [])
-            self._arities[arity].append(function)
+        self._arities = {'number': {}, 'category': {}}
+        for _type in ['number', 'category']:
+            for function in self._function_dict[_type]:
+                arity = function.arity
+                self._arities[_type][arity] = self._arities[_type].get(arity, [])
+                self._arities[_type][arity].append(function)
 
         # 检查fitness
         if isinstance(self.metric, _Fitness):
@@ -556,7 +587,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             params['_transformer'] = self._transformer
         else:
             params['_transformer'] = None
-        params['function_set'] = self._function_set
+        params['function_dict'] = self._function_dict
         params['arities'] = self._arities
         params['method_probs'] = self._method_probs
 
