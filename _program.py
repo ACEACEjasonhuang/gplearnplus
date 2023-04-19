@@ -61,8 +61,8 @@ class _Program(object):
         self.security_data = security_data
         self.time_series_data = time_series_data
 
-        self.num_func_number = self.function_dict['number']
-        self.cat_func_number = self.function_dict['category']
+        self.num_func_number = len(self.function_dict['number'])
+        self.cat_func_number = len(self.function_dict['category'])
 
         if self.program is not None:
             if not self.validate_program():
@@ -127,7 +127,7 @@ class _Program(object):
                 # 特殊情况调整
                 if terminal == self.n_features and \
                         ((self.const_range is None) or \
-                        (('int' or 'float') not in terminal_stack[-1][0])):
+                        (('scalar') not in terminal_stack[-1][0])):
                     # 只能插入向量的情况
                     if 'vector' not in terminal_stack[-1][0]:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
@@ -151,10 +151,10 @@ class _Program(object):
                     program.append(str(candicate_var))
                 else:
                     # 插入常量量
-                    if 'float' in terminal_stack[-1][0]:
-                        terminal = random_state.uniform(*terminal_stack[-1][0]['float'])
-                    elif 'int' in terminal_stack[-1][0]:
-                        terminal = random_state.randint(*terminal_stack[-1][0]['int'])
+                    if 'float' in terminal_stack[-1][0]['scalar']:
+                        terminal = random_state.uniform(*terminal_stack[-1][0]['scalar']['float'])
+                    elif 'int' in terminal_stack[-1][0]['scalar']:
+                        terminal = random_state.randint(*terminal_stack[-1][0]['scalar']['int'])
                     else:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
                     program.append(terminal)

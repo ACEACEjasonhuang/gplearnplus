@@ -100,6 +100,8 @@ class _Function(object):
         # 带替换函数是否与该函数参数长度一致
         if len(candidate_func.param_type) != len(self.param_type):
             return False
+        if self.return_type != candidate_func.return_type:
+            return False
 
         # candidate函数的参数必须为待替换函数参数的子集
         for dict_self, dict_candi in zip(self.param_type, candidate_func.param_type):
@@ -121,7 +123,7 @@ class _Function(object):
 
 
 # warp 用于多进程序列化，会降低进化效率
-def make_function(*, function, name, arity, param_type=None, wrap=True, return_type='number'):
+def make_function(*, function, name, arity, param_type=None, wrap=True, return_type='number', function_type='all'):
     """
        Parameters
        ----------
@@ -293,12 +295,14 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
                          name=name,
                          arity=arity,
                          param_type=param_type,
-                         return_type=return_type)
+                         return_type=return_type,
+                         function_type=function_type)
     return _Function(function=function,
                      name=name,
                      arity=arity,
                      param_type=param_type,
-                     return_type=return_type)
+                     return_type=return_type,
+                     function_type=function_type)
 
 
 def _protected_division(x1, x2):
@@ -334,7 +338,7 @@ def _groupby(gbx, func, *args):
     X_combine = np.array([_index, gbx, *args]).T
     X_combine = X_combine[X_combine[:, 1].argsort()]
     X_split = np.split(X_combine, np.unique(X_combine[:, 1], return_index=True)[1][1:])
-    result_list = [np.repeat(func(*[X_temp[:, i] for i in range(2, X_temp.shape[1])]), len(X_temp))
+    result_list = [func(*[X_temp[:, i] for i in range(2, X_temp.shape[1])])
                    for X_temp in X_split]
     X_combine = np.column_stack((X_combine, np.hstack(result_list)))
     X_combine = X_combine[X_combine[:, 0].argsort()]

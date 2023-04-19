@@ -62,7 +62,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     n_samples, n_features = X.shape
     # Unpack parameters
     tournament_size = params['tournament_size']
-    function_set = params['function_set']
+    function_dict = params['function_dict']
     arities = params['arities']
     init_depth = params['init_depth']
     init_method = params['init_method']
@@ -76,6 +76,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     max_samples = params['max_samples']
     feature_names = params['feature_names']
     cat_var_number = params['cat_var_number']
+    data_type = params['data_type']
 
     max_samples = int(max_samples * n_samples)
 
@@ -139,7 +140,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
                           'parent_idx': parent_index,
                           'parent_nodes': []}
 
-        program = _Program(function_set=function_set,
+        program = _Program(function_dict=function_dict,
                            arities=arities,
                            init_depth=init_depth,
                            init_method=init_method,
@@ -149,7 +150,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
                            const_range=const_range,
                            p_point_replace=p_point_replace,
                            parsimony_coefficient=parsimony_coefficient,
-                           data_type=date_type,
+                           data_type=data_type,
                            feature_names=feature_names,
                            random_state=random_state,
                            cat_var_number = cat_var_number,
@@ -343,7 +344,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 raise ValueError('For Section Data, time_series_index should be None')
             if self.security_index is not None:
                 # 在index和columns中寻找security_index
-                if self.security_index not in X.columns and self.security_index not in X.index.name:
+                if self.security_index not in X.columns and \
+                    (X.index.name is None or self.security_index not in X.index.name):
                     raise ValueError('Can not fund security_index {} in both columns and index'
                                      .format(self.security_index))
                 elif self.security_index in X.columns:
@@ -360,18 +362,19 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 raise ValueError('For time_series Data, time_series_index should NOT be None')
             if self.security_index is not None:
                 raise ValueError('For time_series Data, security_index should be None')
-            if self.time_series_index not in X.columns and self.time_series_index not in X.index.name:
+            if self.time_series_index not in X.columns and \
+                    (X.index.name is None or self.time_series_index not in X.index.name):
                 raise ValueError('Can not fund time_series_index {} in both columns and index'
                                  .format(self.time_series_index))
             elif self.time_series_index in X.columns:
                 X.set_index(self.time_series_index, inplace=True)
 
             # 判断是否有重复时间
-            if len(X[self.time_series_index].unique()) < len(X[self.time_series_index]):
+            if len(X.index.drop_duplicates()) < len(X):
                 raise ValueError('For time_series Data, time_series data should be unique')
 
             X_combine = X.copy()
-            X_combine['_label'] = y
+            X_combine['_label'] = y.values if isinstance(y, pd.Series) else y
             X_combine.sort_index(inplace=True)
             X, y = X_combine.loc[:, self.feature_names], X_combine.loc[:, '_label']
             time_series_data = X.index.values
@@ -383,10 +386,12 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 raise ValueError('For panel Data, security_index should NOT be None')
 
             # security time_series 进入index
-            if self.time_series_index not in X.columns and self.time_series_index not in X.index.name:
+            if self.time_series_index not in X.columns and \
+                    (X.index.name is None or self.time_series_index not in X.index.name):
                 raise ValueError('Can not fund time_series_index {} in both columns and index'
                                  .format(self.time_series_index))
-            elif self.security_index not in X.columns and self.security_index not in X.index.name:
+            elif self.security_index not in X.columns and \
+                    (X.index.name is None or self.security_index not in X.index.name):
                 raise ValueError('Can not fund security_index {} in both columns and index'
                                  .format(self.security_index))
             elif self.time_series_index in X.columns and self.security_index in X.columns:
@@ -402,7 +407,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
 
 
             X_combine = X.copy()
-            X_combine['_label'] = y
+            X_combine['_label'] = y.values if isinstance(y, pd.Series) else y
             X_combine.sort_index(inplace=True)
             X, y = X_combine.loc[:, self.feature_names], X_combine.loc[:, '_label']
             time_series_data = X.index.get_level_values(self.time_series_index).values
@@ -503,6 +508,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                     raise ValueError('invalid function name %s found in '
                                      '`function_set`.' % function)
                 function = deepcopy(_function_map[function])
+                function.add_range(self.const_range)
                 self._function_dict['number'].append(function)
             elif isinstance(function, _Function):
                 function = deepcopy(function)
@@ -531,12 +537,12 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             raise ValueError('There no category var in input features, but there are functions only get category param')
 
         # 点变异记录函数参数个数， 需要在点变异中再考察参数类型
-        self._arities = {'number': {}, 'category': {}}
+        self._arities = {}
         for _type in ['number', 'category']:
             for function in self._function_dict[_type]:
                 arity = function.arity
-                self._arities[_type][arity] = self._arities[_type].get(arity, [])
-                self._arities[_type][arity].append(function)
+                self._arities[arity] = self._arities.get(arity, [])
+                self._arities[arity].append(function)
 
         # 检查fitness
         if isinstance(self.metric, _Fitness):
@@ -604,7 +610,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         params['function_dict'] = self._function_dict
         params['arities'] = self._arities
         params['method_probs'] = self._method_probs
-        params['cat_var_number'] = len(self.category_features)
+        params['cat_var_number'] = len(self.category_features) if self.category_features is not None else 0
 
         # 清空_program
         if not self.warm_start or not hasattr(self, '_programs'):
@@ -768,7 +774,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 components.pop(worst)
                 indices.remove(worst)
                 correlations = correlations[:, indices][indices, :]
-                if max(correlations) < self.tolerable_corr:
+                if np.max(correlations) < self.tolerable_corr:
                     break
                 indices = list(range(len(components)))
             # 余下的选出最优的self.n_components个
@@ -806,10 +812,14 @@ class SymbolicRegressor(BaseSymbolic, RegressorMixin):
                  p_point_replace=0.05,
                  max_samples=1.0,
                  feature_names=None,
+                 time_series_index=None,
+                 security_index=None,
+                 category_features=None,
                  warm_start=False,
                  low_memory=False,
                  n_jobs=1,
                  verbose=0,
+                 data_type='section',
                  random_state=None):
         super(SymbolicRegressor, self).__init__(
             population_size=population_size,
@@ -829,11 +839,15 @@ class SymbolicRegressor(BaseSymbolic, RegressorMixin):
             p_point_replace=p_point_replace,
             max_samples=max_samples,
             feature_names=feature_names,
+            time_series_index=time_series_index,
+            security_index=security_index,
+            category_features=category_features,
             warm_start=warm_start,
             low_memory=low_memory,
             n_jobs=n_jobs,
             verbose=verbose,
-            random_state=random_state)
+            random_state=random_state,
+            data_type=data_type)
 
     def __str__(self):
         """Overloads `print` output of the object to resemble a LISP tree."""
@@ -894,10 +908,14 @@ class SymbolicClassifier(BaseSymbolic, ClassifierMixin):
                  max_samples=1.0,
                  class_weight=None,
                  feature_names=None,
+                 time_series_index=None,
+                 security_index=None,
+                 category_features=None,
                  warm_start=False,
                  low_memory=False,
                  n_jobs=1,
                  verbose=0,
+                 data_type='section',
                  random_state=None):
         super(SymbolicClassifier, self).__init__(
             population_size=population_size,
@@ -919,10 +937,14 @@ class SymbolicClassifier(BaseSymbolic, ClassifierMixin):
             max_samples=max_samples,
             class_weight=class_weight,
             feature_names=feature_names,
+            time_series_index=time_series_index,
+            security_index=security_index,
+            category_features=category_features,
             warm_start=warm_start,
             low_memory=low_memory,
             n_jobs=n_jobs,
             verbose=verbose,
+            data_type=data_type,
             random_state=random_state)
 
     def __str__(self):
@@ -979,11 +1001,16 @@ class SymbolicTransformer(BaseSymbolic, TransformerMixin):
                  p_point_mutation=0.01,
                  p_point_replace=0.05,
                  max_samples=1.0,
+                 tolerable_corr=0.0,
                  feature_names=None,
+                 time_series_index=None,
+                 security_index=None,
+                 category_features=None,
                  warm_start=False,
                  low_memory=False,
                  n_jobs=1,
                  verbose=0,
+                 data_type='section',
                  random_state=None):
         super(SymbolicTransformer, self).__init__(
             population_size=population_size,
@@ -1004,11 +1031,16 @@ class SymbolicTransformer(BaseSymbolic, TransformerMixin):
             p_point_mutation=p_point_mutation,
             p_point_replace=p_point_replace,
             max_samples=max_samples,
+            tolerable_corr=tolerable_corr,
             feature_names=feature_names,
+            time_series_index=time_series_index,
+            security_index=security_index,
+            category_features=category_features,
             warm_start=warm_start,
             low_memory=low_memory,
             n_jobs=n_jobs,
             verbose=verbose,
+            data_type=data_type,
             random_state=random_state)
 
     def __len__(self):

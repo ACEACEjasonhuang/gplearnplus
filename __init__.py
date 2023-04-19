@@ -9,6 +9,6 @@
 # @Software :PyCharm
 -------------------------------------------------
 """
-__version__ = '1.5.7'
+__version__ = '1.5.8'
 
-__all__ = ['genetic', 'functions', 'fitness']
+__all__ = ['genetic', 'functions', 'fitness', 'example']
