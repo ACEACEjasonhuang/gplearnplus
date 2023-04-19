@@ -37,7 +37,6 @@ __all__ = ['SymbolicRegressor', 'SymbolicClassifier', 'SymbolicTransformer']
 
 MAX_INT = np.iinfo(np.int32).max
 
-# todo 继续修改不同参数的逻辑
 # 并行实现子树交叉，变异
 def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data, sample_weight, seeds, params):
     """
@@ -76,7 +75,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     p_point_replace = params['p_point_replace']
     max_samples = params['max_samples']
     feature_names = params['feature_names']
-    data_type = params['data_type']
+    cat_var_number = params['cat_var_number']
 
     max_samples = int(max_samples * n_samples)
 
@@ -153,6 +152,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
                            data_type=date_type,
                            feature_names=feature_names,
                            random_state=random_state,
+                           cat_var_number = cat_var_number,
                            program=program)
 
         program.parents = genome
@@ -212,6 +212,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                  p_point_mutation=0.01,
                  p_point_replace=0.05,
                  max_samples=1.0,
+                 tolerable_corr=0.0,
                  class_weight=None,
                  feature_names=None,
                  time_series_index=None,
@@ -254,6 +255,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         self.verbose = verbose
         self.random_state = random_state
         self.data_type = data_type
+        self.tolerable_corr = tolerable_corr
 
     # 打印训练日志
     def _verbose_reporter(self, run_details=None):
@@ -492,6 +494,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         # 检查function, 稍作修改， 结合const_range到range里面, 并区分number func 和 cat function
         # 存放不同类型的函数（分类和数值）
         self._function_dict = {'number': [], 'category': []}
+        # 检验是否存在接受分类变量参数的函数
+        _cat_func_flag = False
         for function in self.function_set:
             # 类型检验
             if isinstance(function, str):
@@ -504,6 +508,12 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 function = deepcopy(function)
                 # 添加常数范围
                 function.add_range(self.const_range)
+                # 检验是否有仅接收分类变量的函数
+                if not _cat_func_flag:
+                    for _param in function.param_type:
+                        if len(_param) == 1 and 'vector' in _param and \
+                                len(_param['vector']) == 1 and 'category' in _param['vector']:
+                            _cat_func_flag = True
                 if function.return_type == 'number':
                     self._function_dict['number'].append(function)
                 else:
@@ -515,6 +525,10 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         # number类型函数必须有
         if len(self._function_dict['number']) == 0:
             raise ValueError('No valid functions found in `function_set`.')
+
+        # 当存在只接受分类变量参数的函数时（如groupby），category变量不能为空
+        if _cat_func_flag and len(self.category_features) == 0:
+            raise ValueError('There no category var in input features, but there are functions only get category param')
 
         # 点变异记录函数参数个数， 需要在点变异中再考察参数类型
         self._arities = {'number': {}, 'category': {}}
@@ -590,6 +604,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
         params['function_dict'] = self._function_dict
         params['arities'] = self._arities
         params['method_probs'] = self._method_probs
+        params['cat_var_number'] = len(self.category_features)
 
         # 清空_program
         if not self.warm_start or not hasattr(self, '_programs'):
@@ -741,11 +756,10 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             components = list(range(self.hall_of_fame))
             indices = list(range(self.hall_of_fame))
             # Iteratively remove least fit individual of most correlated pair
-            # todo 加入相关性阈值，相关性低于某一阈值时按照ftness筛选
-            # todo 引入非线性信息
             while len(components) > self.n_components:
                 # 去除hall_of_fame - n_components个高度相关特征
                 # 找到相关系数矩阵中相关系数绝对值最大的两个特征，删去其中fitness较低的那个
+                # 相关性低于某一阈值时按照fitness筛选（gplearnplus新增）
                 most_correlated = np.unravel_index(np.argmax(correlations),
                                                    correlations.shape)
                 # The correlation matrix is sorted by fitness, so identifying
@@ -754,7 +768,11 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 components.pop(worst)
                 indices.remove(worst)
                 correlations = correlations[:, indices][indices, :]
+                if max(correlations) < self.tolerable_corr:
+                    break
                 indices = list(range(len(components)))
+            # 余下的选出最优的self.n_components个
+            components = components[:self.n_components]
             self._best_programs = [self._programs[-1][i] for i in
                                    hall_of_fame[components]]
 

@@ -13,7 +13,7 @@ from copy import copy, deepcopy
 import numpy as np
 from sklearn.utils.random import sample_without_replacement
 
-from .functions import _Function
+from .functions import _Function, _groupby
 from .utils import check_random_state
 
 
@@ -37,6 +37,9 @@ class _Program(object):
                  parsimony_coefficient,
                  random_state,
                  data_type,
+                 cat_var_number,
+                 security_data=None,
+                 time_series_data=None,
                  transformer=None,
                  feature_names=None,
                  program=None):
@@ -54,6 +57,9 @@ class _Program(object):
         self.transformer = transformer
         self.feature_names = feature_names
         self.program = program
+        self.cat_func_number = cat_var_number
+        self.security_data = security_data
+        self.time_series_data = time_series_data
 
         self.num_func_number = self.function_dict['number']
         self.cat_func_number = self.function_dict['category']
@@ -116,23 +122,35 @@ class _Program(object):
                 program.append(function)
                 terminal_stack.append(deepcopy(function.param_type))
             else:
-                # We need a terminal, add a variable or constant
+                # 插入变量或者常量
                 terminal = random_state.randint(self.n_features + 1)
-                if (self.const_range is None) or \
-                        (('int' or 'float') not in terminal_stack[-1][0]):
+                # 特殊情况调整
+                if terminal == self.n_features and \
+                        ((self.const_range is None) or \
+                        (('int' or 'float') not in terminal_stack[-1][0])):
+                    # 只能插入向量的情况
                     if 'vector' not in terminal_stack[-1][0]:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
-                    ## 根据参数要求插入分类或者数值型向量
-
-
-                    ## 特殊情况，若X中没有分类型向量，但需要分类型向量，则插入分类函数
-
-
-
 
                     terminal = random_state.randint(self.n_features)
-                    program.append(str(terminal))
-                elif ('vector' not in terminal_stack[-1][0]) or (terminal == self.n_features):
+                elif ('vector' not in terminal_stack[-1][0]):
+                    # 只能插入常量的情况
+                    terminal = self.n_features
+
+                if terminal < self.n_features:
+                    # 插入变量
+                    if 'number' in terminal_stack[-1][0]['vector'] and 'category' in terminal_stack[-1][0][
+                        'vector']:
+                        key = 'category' if terminal < self.cat_func_number else 'number'
+                    else:
+                        key = 'number' if 'number' in terminal_stack[-1][0]['vector'] else 'category'
+                    if self.cat_func_number == 0 and key == 'category':
+                        raise ValueError("There no category var in input features, but it need")
+                    candicate_var = (terminal % self.cat_func_number) if key == 'category' else \
+                            ((terminal % (self.n_features - self.cat_func_number) + self.cat_func_number))
+                    program.append(str(candicate_var))
+                else:
+                    # 插入常量量
                     if 'float' in terminal_stack[-1][0]:
                         terminal = random_state.uniform(*terminal_stack[-1][0]['float'])
                     elif 'int' in terminal_stack[-1][0]:
@@ -140,8 +158,6 @@ class _Program(object):
                     else:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
                     program.append(terminal)
-                else:
-                    program.append(str(terminal))
 
                 terminal_stack[-1].pop(0)
                 while len(terminal_stack[-1]) == 0:
@@ -325,7 +341,13 @@ class _Program(object):
                 terminals = [np.repeat(t, X.shape[0]) if isinstance(t, (float, int))
                              else (X[:, int(t)] if isinstance(t, str)
                              else t) for t in apply_stack[-1][1:]]
-                intermediate_result = function(*terminals)
+                # 对于时序和截面函数加入管道
+                if self.data_type == 'panel' and function.function_type == 'section':
+                    intermediate_result = _groupby(self.time_series_data, function, *terminals)
+                elif self.data_type == 'panel' and function.function_type == 'time_series':
+                    intermediate_result = _groupby(self.security_data, function, *terminals)
+                else:
+                    intermediate_result = function(*terminals)
                 if len(apply_stack) != 1:
                     apply_stack.pop()
                     apply_stack[-1].append(intermediate_result)

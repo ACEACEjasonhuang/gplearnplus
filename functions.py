@@ -38,7 +38,7 @@ class _Function(object):
                   'vector': {'category': (None, None), 'number': (None, None)},
                   'scalar': {'int': (None, None), 'float': (None, None)}
                   }
-    function_type : 'all', 'section', 'time_series
+    function_type : 'all', 'section', 'time_series‘
 
     """
 
@@ -329,6 +329,19 @@ def _sigmoid(x1):
     with np.errstate(over='ignore', under='ignore'):
         return 1 / (1 + np.exp(-x1))
 
+def _groupby(gbx, func, *args):
+    _index = np.arange(len(gbx))
+    X_combine = np.array([_index, gbx, *args]).T
+    X_combine = X_combine[X_combine[:, 1].argsort()]
+    X_split = np.split(X_combine, np.unique(X_combine[:, 1], return_index=True)[1][1:])
+    result_list = [np.repeat(func(*[X_temp[:, i] for i in range(2, X_temp.shape[1])]), len(X_temp))
+                   for X_temp in X_split]
+    X_combine = np.column_stack((X_combine, np.hstack(result_list)))
+    X_combine = X_combine[X_combine[:, 0].argsort()]
+    return X_combine[:, -1]
+
+
+
 
 add2 = _Function(function=np.add, name='add', arity=2)
 sub2 = _Function(function=np.subtract, name='sub', arity=2)
@@ -372,11 +385,14 @@ section_function = []
 time_series_function = []
 
 if __name__ == '__main__':
-    def ff(a, b, c):
-        return a * b + c
-
-    param_type = [{'vector':{'number': (None, None)}}, {'scalar': {'int':(None, 1)}}, {'scalar': {'float': (-1, None)}}]
-    f_m = make_function(function=ff, name='ff', arity=3, param_type=param_type, wrap=True, return_type='number')
-    f_m.add_range((-1, 1))
-    print(f_m.param_type)
+    # def ff(a, b, c):
+    #     return a * b + c
+    #
+    # param_type = [{'vector':{'number': (None, None)}}, {'scalar': {'int':(None, 1)}}, {'scalar': {'float': (-1, None)}}]
+    # f_m = make_function(function=ff, name='ff', arity=3, param_type=param_type, wrap=True, return_type='number')
+    # f_m.add_range((-1, 1))
+    # print(f_m.param_type)
+    a = np.array([1, 2, 2, 1, np.nan])
+    b = np.array([1, 2, 3, 4, 5])
+    print(_groupby(a, max, b))
 
