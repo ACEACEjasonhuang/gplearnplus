@@ -236,7 +236,7 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
             if 'number' in _dict['vector']:
                 args.append(np.ones(10))
             else:
-                args.append(np.array(['a'] * 10))
+                args.append(np.array([1] * 10))
         elif 'scalar' in _dict:
             if 'int' in _dict['scalar']:
                 args.append(((0 if _dict['scalar']['int'][1] is None else _dict['scalar']['int'][1]) +
@@ -256,9 +256,9 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
     if function(*args).shape != (10,):
         raise ValueError('supplied function %s does not return same shape as '
                          'input vectors.' % name)
-    if function(*args).dtype.type is np.int_ or np.float_ and return_type == 'category':
+    if function(*args).dtype.type is np.float_ and return_type == 'category':
         raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
-    elif function(*args).dtype.type is not (np.int_ and np.float_) and return_type == 'number':
+    elif function(*args).dtype not in [np.float, np.int, np.int64] and return_type == 'number':
         raise ValueError('the return type should be category not {}'.format(function(*args).dtype.type))
 
     # Check closure for zero & negative input arguments

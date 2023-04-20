@@ -9,6 +9,16 @@
 # @Software :PyCharm
 -------------------------------------------------
 """
+#####
+# 目录
+# 1. ALL FUNCTION 全局函数
+# 2. TIME SERIES FUNCTION 一般时间序列函数
+# 3. TA FUNCTION 技术指标函数
+# 4. SECTION FUNCTION 截面函数
+# 5. SECTION GROUPBY FUNCTION 截面分类聚合函数
+#
+#
+###
 import numpy as np
 from copy import copy
 from gplearnplus import functions
@@ -37,9 +47,7 @@ def handle_nan(X):
     return X, na_len
 
 
-@no_numpy_warning
-def _neg(X):
-    return -X
+#### ALL FUNCTION #####
 
 @no_numpy_warning
 def _combine(X, Y):
@@ -48,6 +56,11 @@ def _combine(X, Y):
     p3 = 100000007
     return np.mod(X * p1 + Y * p2, p3)
 
+combine = functions.make_function(function=_combine, name='combine', arity=2, return_type='category',
+                                  param_type=[{'vector': {'category': (None, None)}},
+                                              {'vector': {'category': (None, None)}}])
+
+#### TIME SERIES FUNCTION #####
 
 @no_numpy_warning
 def _delay(X, d):
@@ -58,6 +71,9 @@ def _delay(X, d):
     __res = [np.nan] * d + list(X[:-d])
     return np.array(__res)
 
+delay = functions.make_function(function=_delay, name='delay', arity=2, function_type='time_series',
+                                param_type=[{'vector': {'number': (None, None), 'category': (None, None)}},
+                                            {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _delta(X, d):
@@ -69,6 +85,9 @@ def _delta(X, d):
     __res = X - __res
     return np.array(__res)
 
+delta = functions.make_function(function=_delta, name='delta', arity=2, function_type='time_series',
+                                param_type=[{'vector': {'number': (None, None)}},
+                                            {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_min(X, d):
@@ -79,6 +98,8 @@ def _ts_min(X, d):
     __res = [np.nan] * (d - 1) + [np.nanmin(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_min = functions.make_function(function=_ts_min, name='ts_min', arity=2, function_type='time_series',
+                                 param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_max(X, d):
@@ -89,6 +110,8 @@ def _ts_max(X, d):
     __res = [np.nan] * (d - 1) + [np.nanmax(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_max = functions.make_function(function=_ts_max, name='ts_max', arity=2, function_type='time_series',
+                                 param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_argmax(X, d):
@@ -99,6 +122,8 @@ def _ts_argmax(X, d):
     __res = [np.nan] * (d - 1) + [np.argmax(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_argmax = functions.make_function(function=_ts_argmax, name='ts_argmax', arity=2, function_type='time_series',
+                                    param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_argmin(X, d):
@@ -109,6 +134,8 @@ def _ts_argmin(X, d):
     __res = [np.nan] * (d - 1) + [np.argmin(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_argmin = functions.make_function(function=_ts_argmin, name='ts_argmax', arity=2, function_type='time_series',
+                                    param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_rank(X, d):
@@ -119,6 +146,8 @@ def _ts_rank(X, d):
     __res = [np.nan] * (d - 1) + [(np.argsort(X[i:i + d])[-1] / d) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_rank = functions.make_function(function=_ts_rank, name='ts_rank', arity=2, function_type='time_series',
+                                  param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_sum(X, d):
@@ -129,6 +158,8 @@ def _ts_sum(X, d):
     __res = [np.nan] * (d - 1) + [np.nansum(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_sum = functions.make_function(function=_ts_sum, name='ts_sum', arity=2, function_type='time_series',
+                                 param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _ts_stddev(X, d):
@@ -139,6 +170,8 @@ def _ts_stddev(X, d):
     __res = [np.nan] * (d - 1) + [np.nansum(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_stddev = functions.make_function(function=_ts_stddev, name='ts_stddev', arity=2, function_type='time_series',
+                                    param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 def _corrcoef_plus(X, Y):
     assert len(X) == len(Y)
@@ -148,7 +181,6 @@ def _corrcoef_plus(X, Y):
         return np.nan
     else:
         return np.corrcoef(X_, Y_)[0][1]
-
 
 @no_numpy_warning
 def _ts_corr(X, Y, d):
@@ -161,6 +193,11 @@ def _ts_corr(X, Y, d):
     return np.array(__res)
 
 
+ts_corr = functions.make_function(function=_ts_corr, name='ts_corr', arity=3, function_type='time_series',
+                                  param_type=[{'vector': {'number': (None, None)}},
+                                              {'vector': {'number': (None, None)}},
+                                              {'scalar': {'int':(3, 30)}}])
+
 @no_numpy_warning
 def _ts_mean_return(X, d):
     # 处理广播情况
@@ -170,16 +207,23 @@ def _ts_mean_return(X, d):
     __res = [np.nan] * (d - 1) + [np.mean(np.diff(X[i:i + d]) / X[i:i + d - 1]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_mean_return = functions.make_function(function=_ts_mean_return, name='ts_mean_return', arity=2, function_type='time_series',
+                                         param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
+
 @no_numpy_warning
 def _ts_neutralize(X, d):
     # 处理广播情况
     if isinstance(d, (list, np.ndarray)):
         d = d[0]
     d = len(X) - 1 if d >= len(X) else d
-    __res = [np.nan] * (d - 1) + [_protected_division(X - np.mean(X[i:i + d]), np.repeat(np.std(X[i:i + d])), d)
+    __res = [np.nan] * (d - 1) + [_protected_division(X[i + d - 1] - np.mean(X[i:i + d]),np.std(X[i:i + d]))
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+ts_neutralize = functions.make_function(function=_ts_neutralize, name='ts_neutralize', arity=2, function_type='time_series',
+                                        param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
+
+#### TIME SERIES TA FUNCTION ####
 
 @no_numpy_warning
 def _EMA(X, d):
@@ -200,6 +244,8 @@ def _EMA(X, d):
         __res[_l + i] = pre_ma
     return np.array(__res)
 
+EMA = functions.make_function(function=_EMA, name='EMA', arity=2, function_type='time_series',
+                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _DEMA(X, d):
@@ -212,6 +258,8 @@ def _DEMA(X, d):
     __res = 2 * _ema - _eema
     return __res
 
+DEMA = functions.make_function(function=_DEMA, name='DEMA', arity=2, function_type='time_series',
+                               param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _MA(X, d):
@@ -226,6 +274,8 @@ def _MA(X, d):
     __res = [np.nan] * (_l + d - 1) + [np.mean(X[i:i + d]) for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+MA = functions.make_function(function=_MA, name='MA', arity=2, function_type='time_series',
+                             param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _KAMA(X, d):
@@ -248,6 +298,8 @@ def _KAMA(X, d):
         __res[_l + i] = _at * X[i] + (1 - _at) * (__res[_l + i - 1] if i != d else X[i - 1])
     return np.array(__res)
 
+KAMA = functions.make_function(function=_KAMA, name='DEMA', arity=2, function_type='time_series',
+                               param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _MIDPONIT(X, d):
@@ -259,6 +311,8 @@ def _MIDPONIT(X, d):
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+MIDPOINT = functions.make_function(function=_MIDPONIT, name='MA', arity=2, function_type='time_series',
+                                   param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _BETA(X, Y, d):
@@ -274,6 +328,10 @@ def _BETA(X, Y, d):
                             for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+BETA = functions.make_function(function=_BETA, name='BETA', arity=3, function_type='time_series',
+                               param_type=[{'vector': {'number': (None, None)}},
+                                           {'vector': {'number': (None, None)}},
+                                           {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _LINEARREG_SLOPE(X, d):
@@ -287,6 +345,9 @@ def _LINEARREG_SLOPE(X, d):
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
+LINEARREG_SLOPE = functions.make_function(function=_LINEARREG_SLOPE, name='LINEARREG_SLOPE', arity=2, function_type='time_series',
+                                          param_type=[{'vector': {'number': (None, None)}},
+                                                      {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _LINEARREG_ANGLE(X, d):
@@ -300,7 +361,9 @@ def _LINEARREG_ANGLE(X, d):
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
 
-
+LINEARREG_ANGLE = functions.make_function(function=_LINEARREG_ANGLE, name='LINEARREG_ANGLE', arity=2, function_type='time_series',
+                                          param_type=[{'vector': {'number': (None, None)}},
+                                                      {'scalar': {'int':(3, 30)}}])
 
 @no_numpy_warning
 def _LINEARREG_INTERCEPT(X, d):
@@ -313,6 +376,12 @@ def _LINEARREG_INTERCEPT(X, d):
                                   * np.std(X[i:i + d]) / np.std(Y)) * np.sum(Y)) / d
                                   for i in range(len(X) - d + 1)]
     return np.array(__res)
+
+LINEARREG_INTERCEPT = functions.make_function(function=_LINEARREG_INTERCEPT, name='LINEARREG_INTERCEPT', arity=2, function_type='time_series',
+                                              param_type=[{'vector': {'number': (None, None)}},
+                                                          {'scalar': {'int':(3, 30)}}])
+
+#### SECTION FUNCTION ####
 
 @no_numpy_warning
 def _MAX_SECTION(X):
@@ -345,7 +414,7 @@ def _RANK_SECTION(X):
     idx = np.argsort(X)
     # 构建等级数组
     rank = np.empty_like(idx)
-    rank[idx] = np.arange(len(arr))
+    rank[idx] = np.arange(len(X))
     return rank
 
 @no_numpy_warning
@@ -353,49 +422,65 @@ def _NEUTRALIZE_SECTION(X):
     return _protected_division(X - np.mean(X), np.repeat(np.std(X), len(X)))
 
 @no_numpy_warning
-def _GROUPBYTHENMAX(X, gbx):
-    # 处理广播情况
+def _FREQ_SECTION(X):
+    unique_values, counts = np.unique(X, return_counts=True)
+    count_dict = dict(zip(unique_values, counts))
+    vectorized_func = np.vectorize(lambda x: count_dict[x])
+    return vectorized_func(X)
+
+@no_numpy_warning
+def _CUT_EQUAL_DISTANCE(X, d):
+    if isinstance(d, (list, np.ndarray)):
+        d = d[0]
+    d = len(X) - 1 if d >= len(X) - 1 else d
+    bins = [np.min(X) + i * (np.max(X) - np.min(X)) * 1.000001 / d for i in range(d + 1)]
+    return np.digitize(X, bins)
+
+@no_numpy_warning
+def _CUT_EQUAL_AMOUNT(X, d):
+    X_ = _RANK_SECTION(X)
+    return _CUT_EQUAL_DISTANCE(X_, d)
+
+
+@no_numpy_warning
+def _GROUPBYTHENMAX(gbx, X):
     return _groupby(gbx, _MAX_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENMIN(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENMIN(gbx, X):
     return _groupby(gbx, _MIN_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENMEAN(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENMEAN(gbx, X):
     return _groupby(gbx, _MEAN_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENMEDIAN(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENMEDIAN(gbx, X):
     return _groupby(gbx, _MEDIAN_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENSTD(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENSTD(gbx, X):
     return _groupby(gbx, _STD_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENRANK(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENRANK(gbx, X):
     return _groupby(gbx, _RANK_SECTION, X)
 
 @no_numpy_warning
-def _GROUPBYTHENNEUTRALIZE(X, gbx):
-    # 处理广播情况
+def _GROUPBYTHENNEUTRALIZE(gbx, X):
     return _groupby(gbx, _NEUTRALIZE_SECTION, X)
 
-delay = functions.make_function(function=_delay, name='delay', arity=2, function_type='time_series',
-                                param_type=[{'vector': {'number': (None, None), 'category': (None, None)}},
-                                            {'scalar': {'int':(3, 30)}}])
-delta = functions.make_function(function=_delta, name='delta', arity=2, function_type='time_series',
-                                param_type=[{'vector': {'number': (None, None)}},
-                                            {'scalar': {'int':(3, 30)}}])
-combine = functions.make_function(function=_combine, name='combine', arity=2, return_type='category',
-                                  param_type=[{'vector': {'category': (None, None)}},
-                                              {'vector': {'category': (None, None)}}])
+@no_numpy_warning
+def _GROUPBYTHEN_CUT_EQ_DIST(gbx, X, d):
+    return _groupby(gbx, _CUT_EQUAL_DISTANCE, X, d)
+
+@no_numpy_warning
+def _GROUPBYTHEN_CUT_EQ_AMT(gbx, X, d):
+    return _groupby(gbx, _CUT_EQUAL_AMOUNT, X, d)
+
+@no_numpy_warning
+def _GROUPBYTHENFREQ(gbx, X):
+    return _groupby(gbx, _FREQ_SECTION, X)
 
 sec_max = functions.make_function(function=_MAX_SECTION, name='sec_max', arity=1, function_type='section',
                                   param_type=[{'vector': {'number': (None, None)}}])
@@ -411,89 +496,60 @@ sec_rank = functions.make_function(function=_RANK_SECTION, name='sec_rank', arit
                                    param_type=[{'vector': {'number': (None, None)}}])
 sec_neutralize = functions.make_function(function=_NEUTRALIZE_SECTION, name='sec_neutralize', arity=1,
                                          function_type='section', param_type=[{'vector': {'number': (None, None)}}])
-
-groupby_max = functions.make_function(function=_GROUPBYTHENMAX, name='groupby_max', arity=2, function_type='section',
-                                      param_type=[{'vector': {'number': (None, None)}},
-                                                  {'category': {'number': (None, None)}}])
-groupby_min = functions.make_function(function=_GROUPBYTHENMIN, name='groupby_min', arity=2, function_type='section',
-                                      param_type=[{'vector': {'number': (None, None)}},
-                                                  {'category': {'number': (None, None)}}])
-groupby_mean = functions.make_function(function=_GROUPBYTHENMEAN, name='groupby_mean', arity=2, function_type='section',
-                                       param_type=[{'vector': {'number': (None, None)}},
-                                                   {'category': {'number': (None, None)}}])
-groupby_median = functions.make_function(function=_GROUPBYTHENMEDIAN, name='groupby_median', arity=2, function_type='section',
-                                         param_type=[{'vector': {'number': (None, None)}},
-                                                     {'category': {'number': (None, None)}}])
-groupby_std = functions.make_function(function=_GROUPBYTHENSTD, name='groupby_std', arity=2, function_type='section',
-                                      param_type=[{'vector': {'number': (None, None)}},
-                                                  {'category': {'number': (None, None)}}])
-groupby_rank = functions.make_function(function=_GROUPBYTHENRANK, name='groupby_rank', arity=2, function_type='section',
-                                       param_type=[{'vector': {'number': (None, None)}},
-                                                   {'category': {'number': (None, None)}}])
-groupby_neutralize = functions.make_function(function=_GROUPBYTHENNEUTRALIZE, name='groupby_neutralize', arity=2,
-                                             function_type='section',
+CUT_EQUAL_DISTANCE = functions.make_function(function=_CUT_EQUAL_DISTANCE, name='CUT_EQUAL_DISTANCE', arity=2, function_type='section',
+                                             return_type='category',
                                              param_type=[{'vector': {'number': (None, None)}},
-                                                         {'category': {'number': (None, None)}}])
-
-ts_min = functions.make_function(function=_ts_min, name='ts_min', arity=2, function_type='time_series',
-                                 param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_max = functions.make_function(function=_ts_max, name='ts_max', arity=2, function_type='time_series',
-                                  param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_argmax = functions.make_function(function=_ts_argmax, name='ts_argmax', arity=2, function_type='time_series',
-                                     param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_argmin = functions.make_function(function=_ts_argmin, name='ts_argmax', arity=2, function_type='time_series',
-                                     param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_rank = functions.make_function(function=_ts_rank, name='ts_rank', arity=2, function_type='time_series',
-                                  param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_sum = functions.make_function(function=_ts_sum, name='ts_sum', arity=2, function_type='time_series',
-                                 param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_stddev = functions.make_function(function=_ts_stddev, name='ts_stddev', arity=2, function_type='time_series',
-                                    param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_corr = functions.make_function(function=_ts_corr, name='ts_corr', arity=3, function_type='time_series',
-                                  param_type=[{'vector': {'number': (None, None)}},
-                                              {'vector': {'number': (None, None)}},
-                                              {'scalar': {'int':(3, 30)}}])
-ts_mean_return = functions.make_function(function=_ts_mean_return, name='ts_mean_return', arity=2, function_type='time_series',
-                                         param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-ts_neutralize = functions.make_function(function=_ts_neutralize, name='ts_neutralize', arity=2, function_type='time_series',
-                                         param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-
-EMA = functions.make_function(function=_EMA, name='EMA', arity=2, function_type='time_series',
-                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-DEMA = functions.make_function(function=_DEMA, name='DEMA', arity=2, function_type='time_series',
-                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-KAMA = functions.make_function(function=_DEMA, name='DEMA', arity=2, function_type='time_series',
-                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-MA = functions.make_function(function=_MA, name='MA', arity=2, function_type='time_series',
-                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-MIDPOINT = functions.make_function(function=_MA, name='MA', arity=2, function_type='time_series',
-                              param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
-BETA = functions.make_function(function=_BETA, name='BETA', arity=3, function_type='time_series',
-                               param_type=[{'vector': {'number': (None, None)}},
-                                           {'vector': {'number': (None, None)}},
-                                           {'scalar': {'int':(3, 30)}}])
-LINEARREG_SLOPE = functions.make_function(function=_LINEARREG_SLOPE, name='LINEARREG_SLOPE', arity=2, function_type='time_series',
-                                          param_type=[{'vector': {'number': (None, None)}},
-                                                      {'scalar': {'int':(3, 30)}}])
-LINEARREG_ANGLE = functions.make_function(function=_LINEARREG_ANGLE, name='LINEARREG_ANGLE', arity=2, function_type='time_series',
-                                          param_type=[{'vector': {'number': (None, None)}},
-                                                      {'scalar': {'int':(3, 30)}}])
-LINEARREG_INTERCEPT = functions.make_function(function=_LINEARREG_INTERCEPT, name='LINEARREG_INTERCEPT', arity=2, function_type='time_series',
-                                              param_type=[{'vector': {'number': (None, None)}},
                                                           {'scalar': {'int':(3, 30)}}])
+
+CUT_EQUAL_AMOUNT = functions.make_function(function=_CUT_EQUAL_AMOUNT, name='CUT_EQUAL_AMOUNT', arity=2, function_type='section',
+                                           return_type='category',
+                                           param_type=[{'vector': {'number': (None, None)}},
+                                                          {'scalar': {'int':(3, 30)}}])
+groupby_max = functions.make_function(function=_GROUPBYTHENMAX, name='gb_max', arity=2, function_type='section',
+                                      param_type=[{'vector': {'category': (None, None)}},
+                                                  {'vector': {'number': (None, None)}}])
+groupby_min = functions.make_function(function=_GROUPBYTHENMIN, name='gb_min', arity=2, function_type='section',
+                                      param_type=[{'vector': {'category': (None, None)}},
+                                                  {'vector': {'number': (None, None)}}])
+groupby_mean = functions.make_function(function=_GROUPBYTHENMEAN, name='gb_mean', arity=2, function_type='section',
+                                       param_type=[{'vector': {'category': (None, None)}},
+                                                   {'vector': {'number': (None, None)}}])
+groupby_median = functions.make_function(function=_GROUPBYTHENMEDIAN, name='gb_median', arity=2, function_type='section',
+                                         param_type=[{'vector': {'category': (None, None)}},
+                                                     {'vector': {'number': (None, None)}}])
+groupby_std = functions.make_function(function=_GROUPBYTHENSTD, name='gb_std', arity=2, function_type='section',
+                                      param_type=[{'vector': {'category': (None, None)}},
+                                                  {'vector': {'number': (None, None)}}])
+groupby_rank = functions.make_function(function=_GROUPBYTHENRANK, name='gb_rank', arity=2, function_type='section',
+                                       param_type=[{'vector': {'category': (None, None)}},
+                                                   {'vector': {'number': (None, None)}}])
+
+groupby_neutralize = functions.make_function(function=_GROUPBYTHENNEUTRALIZE, name='gb_neu', arity=2,
+                                             function_type='section',
+                                             param_type=[{'vector': {'category': (None, None)}},
+                                                         {'vector': {'number': (None, None)}}])
+
+groupby_cut_equal_distance = functions.make_function(function=_GROUPBYTHEN_CUT_EQ_DIST, name='gb_cut_eq_dist', arity=3,
+                                                     function_type='section',
+                                                     param_type=[{'vector': {'category': (None, None)}},
+                                                                 {'vector': {'number': (None, None)}},
+                                                                 {'scalar': {'int': (3, 30)}}])
+
+groupby_cut_equal_amount = functions.make_function(function=_GROUPBYTHEN_CUT_EQ_AMT, name='gb_cut_eq_amt', arity=3,
+                                                   function_type='section',
+                                                   param_type=[{'vector': {'category': (None, None)}},
+                                                               {'vector': {'number': (None, None)}},
+                                                               {'scalar': {'int': (3, 30)}}])
+
 __all__ = ['delay', 'delta', 'sec_max', 'sec_min', 'sec_median', 'ts_min', 'ts_max', 'ts_sum', 'ts_corr', 'ts_rank',
            'ts_stddev', 'ts_argmax', 'ts_argmin', 'ts_mean_return', 'EMA', 'DEMA', 'KAMA', 'MA', 'MIDPOINT',
            'BETA', 'LINEARREG_ANGLE', 'LINEARREG_SLOPE', 'LINEARREG_INTERCEPT', 'sec_std', 'sec_rank', 'sec_mean',
            'groupby_std', 'groupby_max', 'groupby_median', 'groupby_mean', 'groupby_rank', 'groupby_min',
-           'ts_neutralize']
+           'ts_neutralize', 'sec_neutralize', 'groupby_neutralize']
 
 
 if __name__ == "__main__":
     a = np.random.uniform(0.9, 1.1, 30)
     b = np.random.uniform(0.9, 1.1, 30)
-
-    a = np.cumprod(a)
-    b = np.cumprod(b)
-    a[5] = np.nan
-    b[6] = np.nan
-    print(_EMA(_EMA(a, 10), 10))
+    print(_CUT_EQUAL_DISTANCE(a, 3))
+    print(_CUT_EQUAL_AMOUNT(a, 3))
