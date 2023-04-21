@@ -57,6 +57,9 @@ class _Function(object):
         self.function_type = function_type
 
     def __call__(self, *args):
+        for _param, _param_type in zip(args, self.param_type):
+            if len(_param_type) == 1 and 'scalar' in _param_type and isinstance(_param, (list, np.ndarray)):
+                _param = _param[0]
         return self.function(*args)
 
     def add_range(self, const_range):
@@ -120,6 +123,7 @@ class _Function(object):
                                         dict_candi['scalar'][lower_type][1] > dict_candi['scalar'][lower_type][1]):
                                     return False
         return True
+
 
 
 # warp 用于多进程序列化，会降低进化效率
@@ -248,6 +252,7 @@ def make_function(*, function, name, arity, param_type=None, wrap=True, return_t
     try:
         function(*args)
     except (ValueError, TypeError):
+        print(args)
         raise ValueError('supplied function %s does not support arity of %d.'
                          % (name, arity))
     if not hasattr(function(*args), 'shape'):
@@ -333,16 +338,14 @@ def _sigmoid(x1):
     with np.errstate(over='ignore', under='ignore'):
         return 1 / (1 + np.exp(-x1))
 
-def _groupby(gbx, func, *args):
-    _index = np.arange(len(gbx))
-    X_combine = np.array([_index, gbx, *args]).T
-    X_combine = X_combine[X_combine[:, 1].argsort()]
-    X_split = np.split(X_combine, np.unique(X_combine[:, 1], return_index=True)[1][1:])
-    result_list = [func(*[X_temp[:, i] for i in range(2, X_temp.shape[1])])
-                   for X_temp in X_split]
-    X_combine = np.column_stack((X_combine, np.hstack(result_list)))
-    X_combine = X_combine[X_combine[:, 0].argsort()]
-    return X_combine[:, -1]
+def _groupby(gbx, func, *args, **kwargs):
+    indices = np.argsort(gbx)
+    gbx_sorted = gbx[indices]
+    X = np.column_stack((np.arange(len(gbx)), gbx_sorted, *args))
+    splits = np.split(X, np.unique(gbx_sorted, return_index=True)[1][1:])
+    result_list = [func(*(split[:, 2:].T), **kwargs) for split in splits]
+    result = np.hstack(result_list)
+    return result[indices.argsort()]
 
 
 
