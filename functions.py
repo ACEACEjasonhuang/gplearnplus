@@ -20,6 +20,9 @@ __all__ = ['make_function', 'raw_function_list']
 class _Function(object):
     """
     函数对象，参数至少有一个为向量
+    默认函数类型为，all，既可用于时序也可用于截面
+    默认返回类型为数值，
+    默认输入类型，数值向量或者标量
 
     Parameters
     ----------
@@ -34,11 +37,12 @@ class _Function(object):
     arity : int
         The number of arguments that the ``function`` takes.
 
-    param_type : {
+    param_type : [{
                   'vector': {'category': (None, None), 'number': (None, None)},
                   'scalar': {'int': (None, None), 'float': (None, None)}
-                  }
+                  },]
     function_type : 'all', 'section', 'time_series‘
+    return_type: 'number', 'category'
 
     """
 
@@ -50,6 +54,11 @@ class _Function(object):
             # 默认不接受分类类型
             param_type = arity * [{'vector':{'number': (None, None)},
                                    'scalar': {'int': (None, None), 'float': (None, None)}}]
+        else:
+            # 防止长度不一
+            if len(param_type) != arity:
+                raise ValueError(
+                    "length of param_type should be equal to arity, it should be {}, not {}".format(arity, len(param_type)))
         self.param_type = param_type
         if (return_type != 'number') and (return_type != 'category'):
             raise ValueError("return_type of function {} should be number or category, NOT {}".format(name, return_type))
@@ -57,13 +66,18 @@ class _Function(object):
         self.function_type = function_type
 
     def __call__(self, *args):
+        """
+        调用函数特殊处理，
+        参数仅接受标量，却传入向量
+        则取向量第一个值为标量
+        """
         for _param, _param_type in zip(args, self.param_type):
             if len(_param_type) == 1 and 'scalar' in _param_type and isinstance(_param, (list, np.ndarray)):
                 _param = _param[0]
         return self.function(*args)
 
     def add_range(self, const_range):
-        # 替换掉参数中没有约束的范围
+        # 作用：替换掉参数中没有约束的范围，给所有标量限制范围
         # 若没有const_range, 则表明所有函数不接收常数， 去掉所有的const type
         if const_range is None:
             for i, _dict in enumerate(self.param_type):
@@ -107,6 +121,7 @@ class _Function(object):
             return False
 
         # candidate函数的参数必须为待替换函数参数的子集
+        # 要求替换和，函数的所有参数仍然合法
         for dict_self, dict_candi in zip(self.param_type, candidate_func.param_type):
             if len(dict_candi) <= len(dict_self):
                 return False

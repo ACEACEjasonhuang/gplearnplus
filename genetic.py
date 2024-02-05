@@ -75,7 +75,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     p_point_replace = params['p_point_replace']
     max_samples = params['max_samples']
     feature_names = params['feature_names']
-    cat_var_number = params['cat_var_number']
+    n_cat_features = params['cat_var_number']
     data_type = params['data_type']
 
     max_samples = int(max_samples * n_samples)
@@ -153,7 +153,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
                            data_type=data_type,
                            feature_names=feature_names,
                            random_state=random_state,
-                           cat_var_number = cat_var_number,
+                           n_cat_features=n_cat_features,
                            program=program)
 
         program.parents = genome

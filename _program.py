@@ -18,13 +18,9 @@ from .utils import check_random_state
 
 
 class _Program(object):
-    """
+    '''
 
-    修改：
-    arities
-
-    """
-
+    '''
     def __init__(self,
                  function_dict,
                  arities,
@@ -37,13 +33,30 @@ class _Program(object):
                  parsimony_coefficient,
                  random_state,
                  data_type,
-                 cat_var_number,
-                 security_data=None,
-                 time_series_data=None,
+                 n_cat_features,
                  transformer=None,
                  feature_names=None,
                  program=None):
+        '''
 
+        Parameters
+        ----------
+        function_dict: 储存基础函数，原为function_set {'number': [], 'category': []}
+        arities: 函数参数个数
+        init_depth：初始深度, 接受元组（min_depth, max_depth）
+        init_method：生成方式，
+        n_features：特征个数
+        const_range：常数范围, (-1, 1)
+        metric：目标函数，’MAE‘,'MSE'
+        p_point_replace：点变异概率
+        parsimony_coefficient:惩罚系数，'auto'护着浮点数，默认0.01
+        random_state：随机对象
+        data_type：新增参数 截面，时序or面板， ’section‘， ’time_series', 'panel'
+        n_cat_features：新增参数 分类特征个数
+        transformer
+        feature_names
+        program
+        '''
         self.function_dict = function_dict
         self.arities = arities
         self.init_depth = (init_depth[0], init_depth[1] + 1)
@@ -57,14 +70,13 @@ class _Program(object):
         self.transformer = transformer
         self.feature_names = feature_names
         self.program = program
-        self.cat_func_number = cat_var_number
-        self.security_data = security_data
-        self.time_series_data = time_series_data
+        self.n_cat_features = n_cat_features
 
         self.num_func_number = len(self.function_dict['number'])
         self.cat_func_number = len(self.function_dict['category'])
 
         if self.program is not None:
+            # 验证当下树是否完整
             if not self.validate_program():
                 raise ValueError('The supplied program is incomplete.')
         else:
@@ -92,72 +104,84 @@ class _Program(object):
         max_depth = random_state.randint(*self.init_depth)
 
         # Start a program with a function to avoid degenerative programs
-        # 因子返回类型必须为数值类型
-        function = random_state.randint(len(self.function_dict['number']))
-        function = self.function_dict['number'][function]
+        # 公式树返回类型必须为数值类型，随机挑选一个返回数值向量的函数作为公式树的根节点
+        _root_function_num = random_state.randint(len(self.function_dict['number']))
+        _root_function = self.function_dict['number'][_root_function_num]
 
-        program = [function]
-        terminal_stack = [deepcopy(function.param_type)]
+        # 初始化公式树和工作栈，当前工作栈中仅有根节点,工作栈中存储参数类型列表，用于树的生成
+        program = [_root_function]
+        terminal_stack = [deepcopy(_root_function.param_type)]
 
         while terminal_stack:
             depth = len(terminal_stack)
-            choice = self.n_features + self.num_func_number + self.cat_func_number
-            choice = random_state.randint(choice)
+            candidate_num = self.n_features + self.num_func_number + self.cat_func_number
+            candidate_choice = random_state.randint(candidate_num)
             # Determine if we are adding a function or terminal
+            # terminal_stack的元素必须是list
             if not isinstance(terminal_stack[-1], list):
                 raise ValueError("element in terminal_stack should be list")
+            # terminal_stack的元素的list内，元素须为dict
             if not isinstance(terminal_stack[-1][0], dict):
                 raise ValueError("element in terminal_stack'element should be dict")
-            # 插入函数的情况
+
+            # 深度优先的方式构建公式树，迭代处理工作栈中最后一个子树第一个子节点
+            # 与gplearn主要不同点
             if ('vector' in terminal_stack[-1][0]) and (depth < max_depth) \
-                    and (method == 'full' or choice <= (self.num_func_number + self.cat_func_number)):
-                # 必须可接收向量且深度未满
+                    and (method == 'full' or candidate_choice <= (self.num_func_number + self.cat_func_number)):
+                # 插入函数的要求，1 该节点必须接受向量，2.当前深度比最大深度低， 3.随机种子选中了函数或者模式为‘full’
+                
+                # 决定选择数值型函数 还是 分类型函数
+                # 若该节点都可以接受，则随机决定插入的函数类型
+                # 否则根据可接受类型插入相应函数
                 _choice = random_state.randint(self.cat_func_number + self.num_func_number)
                 if 'number' in terminal_stack[-1][0]['vector'] and 'category' in terminal_stack[-1][0]['vector']:
                     key = 'number' if _choice < self.num_func_number else 'category'
                 else:
                     key = 'number' if 'number' in terminal_stack[-1][0]['vector'] else 'category'
-                function = self.function_dict[key][_choice %
+                function_choice = self.function_dict[key][_choice %
                                                    (self.num_func_number if key == 'number' else self.cat_func_number)]
-                program.append(function)
-                terminal_stack.append(deepcopy(function.param_type))
+                program.append(function_choice)
+                terminal_stack.append(deepcopy(function_choice.param_type))
             else:
-                # 插入变量或者常量
-                terminal = random_state.randint(self.n_features + 1)
-                # 特殊情况调整
-                if terminal == self.n_features and \
+                # 插入向量或者常量
+                _choice = random_state.randint(self.n_features + 1)
+                # 根据特殊情况调整_choice
+                # 1.若const_range为None 或者 不接受标量类型，则默认插入向量
+                # 2.若不接受向量类型，则默认插入标量
+                # 3.其他情况按照随机数决定
+                if _choice == self.n_features and \
                         ((self.const_range is None) or \
                         (('scalar') not in terminal_stack[-1][0])):
                     # 只能插入向量的情况
                     if 'vector' not in terminal_stack[-1][0]:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
 
-                    terminal = random_state.randint(self.n_features)
+                    _choice = random_state.randint(self.n_features)
                 elif ('vector' not in terminal_stack[-1][0]):
                     # 只能插入常量的情况
-                    terminal = self.n_features
+                    _choice = self.n_features
 
-                if terminal < self.n_features:
-                    # 插入变量
+                if _choice < self.n_features:
+                    # 插入向量
                     if 'number' in terminal_stack[-1][0]['vector'] and 'category' in terminal_stack[-1][0][
                         'vector']:
-                        key = 'category' if terminal < self.cat_func_number else 'number'
+                        key = 'category' if _choice < self.n_cat_features else 'number'
                     else:
                         key = 'number' if 'number' in terminal_stack[-1][0]['vector'] else 'category'
-                    if self.cat_func_number == 0 and key == 'category':
+                    if self.n_cat_features == 0 and key == 'category':
                         raise ValueError("There no category var in input features, but it need")
-                    candicate_var = (terminal % self.cat_func_number) if key == 'category' else \
-                            ((terminal % (self.n_features - self.cat_func_number) + self.cat_func_number))
+                    candicate_var = (_choice % self.n_cat_features) if key == 'category' else \
+                            ((_choice % (self.n_features - self.n_cat_features) + self.n_cat_features))
                     program.append(str(candicate_var))
                 else:
-                    # 插入常量量
+                    # 插入常量
                     if 'float' in terminal_stack[-1][0]['scalar']:
-                        terminal = random_state.uniform(*terminal_stack[-1][0]['scalar']['float'])
+                        _choice = random_state.uniform(*terminal_stack[-1][0]['scalar']['float'])
                     elif 'int' in terminal_stack[-1][0]['scalar']:
-                        terminal = random_state.randint(*terminal_stack[-1][0]['scalar']['int'])
+                        _choice = random_state.randint(*terminal_stack[-1][0]['scalar']['int'])
                     else:
                         raise ValueError('Error param type {}'.format(terminal_stack[-1][0]))
-                    program.append(terminal)
+                    program.append(_choice)
 
                 terminal_stack[-1].pop(0)
                 while len(terminal_stack[-1]) == 0:
@@ -307,9 +331,9 @@ class _Program(object):
 
         Parameters
         ----------
-        X : {array-like}, shape = [n_samples, n_features]
-            Training vectors, where n_samples is the number of samples and
-            n_features is the number of features.
+        X : {array-like}
+            若数据类型为'section'，'time_series'则为[n_samples, n_features]
+            若数据类型为'panel', 则为[n_samples, n_features + 2]
 
         Returns
         -------
@@ -317,6 +341,12 @@ class _Program(object):
             The result of executing the program on X.
 
         """
+        # 检验X列数是否正确
+        if self.data_type == 'panel' and X.shape[1] != self.n_features + 2:
+            raise ValueError("For panel Data, the col number of X should be n_features + 2")
+        elif self.data_type in ['section', 'time_series'] and X.shape[1] != self.n_features:
+            raise ValueError("For section or time_series Data, the col number of X should be n_features")
+
         # Check for single-node programs
         node = self.program[0]
         # 常数
@@ -343,9 +373,11 @@ class _Program(object):
                              else t) for t in apply_stack[-1][1:]]
                 # 对于时序和截面函数加入管道
                 if self.data_type == 'panel' and function.function_type == 'section':
-                    intermediate_result = _groupby(self.time_series_data, function, *terminals)
+                    time_series_data = X.iloc[:, -1]
+                    intermediate_result = _groupby(time_series_data, function, *terminals)
                 elif self.data_type == 'panel' and function.function_type == 'time_series':
-                    intermediate_result = _groupby(self.security_data, function, *terminals)
+                    security_data = X.iloc[:, -2]
+                    intermediate_result = _groupby(security_data, function, *terminals)
                 else:
                     intermediate_result = function(*terminals)
                 if len(apply_stack) != 1:
@@ -377,9 +409,11 @@ class _Program(object):
         -------
         indices : array-like, shape = [n_samples]
             The in-sample indices.
+            抽样内index
 
         not_indices : array-like, shape = [n_samples]
             The out-of-sample indices.
+            抽样外index
 
         """
         if self._indices_state is None and random_state is None:
@@ -405,7 +439,7 @@ class _Program(object):
 
         return indices, not_indices
 
-    # 或许衡量模型适应度的指标
+    # 获取衡量模型适应度的指标
     def _indices(self):
         """Get the indices used to measure the program's fitness."""
         return self.get_all_indices()[0]
@@ -416,9 +450,9 @@ class _Program(object):
 
         Parameters
         ----------
-        X : {array-like}, shape = [n_samples, n_features]
-            Training vectors, where n_samples is the number of samples and
-            n_features is the number of features.
+        X : {array-like}
+            若数据类型为'section'，'time_series'则为[n_samples, n_features]
+            若数据类型为'panel', 则为[n_samples, n_features + 2]
 
         y : array-like, shape = [n_samples]
             Target values.
@@ -432,6 +466,8 @@ class _Program(object):
             The raw fitness of the program.
 
         """
+        if X.shape[0] != len(y):
+            raise ValueError("The length of y should be equal to X")
         y_pred = self.execute(X)
         if self.transformer:
             y_pred = self.transformer(y_pred)
@@ -461,8 +497,9 @@ class _Program(object):
         penalty = parsimony_coefficient * len(self.program) * self.metric.sign
         return self.raw_fitness_ - penalty
 
-    # 此处做了修改，不会选到常数
-    def get_subtree(self, random_state, program=None):
+    # 此处做了修改，不会选到标量
+    # 需要考虑返回类型
+    def get_subtree(self, random_state, program=None, type=None):
         """Get a random subtree from the program.
 
         Parameters
@@ -474,16 +511,20 @@ class _Program(object):
             The flattened tree representation of the program. If None, the
             embedded tree in the object will be used.
 
+        type: 子数的返回类型限定 默认 None, number 和 category都可以选择
+
         Returns
         -------
         start, end : tuple of two ints
             The indices of the start and end of the random subtree.
-
+        return_type: 子数返回类型，数值向量 还是 分类向量， 防止交叉时出现错误
         """
         if program is None:
             program = self.program
         # Choice of crossover points follows Koza's (1992) widely used approach
-        # 90%选到函数，10%选取向量叶子节点
+        # 子数节点概率权重90%，向量叶子节点概率权重10%，标量叶子节点概率权重0
+        # 若type为number， 所有返回category的节点概率权重为0
+        # 若type为category， 所有返回number的节点概率权重为0
         probs = np.array([0.9 if isinstance(node, _Function) else (0.1 if isinstance(node, str) else 0.0)
                           for node in program])
         probs = np.cumsum(probs / probs.sum())
@@ -497,12 +538,20 @@ class _Program(object):
                 stack += node.arity
             end += 1
 
-        return start, end
+        if isinstance(program[start], _Function):
+            return_type = _Function.return_type
+        elif isinstance(program[start], str):
+            return_type = 'category' if int(program[start]) < self.n_cat_features else 'number'
+        else:
+            raise ValueError("The return type of sub_tree's root should be number or category")
+
+        return start, end, return_type
 
     def reproduce(self):
         """Return a copy of the embedded program."""
         return copy(self.program)
 
+    # 交换self 和 donor 的子树
     # 此处不会交换常数
     def crossover(self, donor, random_state):
         """Perform the crossover genetic operation on the program.

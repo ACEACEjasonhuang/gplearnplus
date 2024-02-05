@@ -39,6 +39,7 @@ def no_numpy_warning(func):
 
 @nb.jit(nopython=True)
 def handle_nan(X):
+    # 前值填充
     X = np.copy(X)
     _temp = np.nan
     na_len = 0
@@ -199,7 +200,7 @@ ts_corr = functions.make_function(function=_ts_corr, name='ts_corr', arity=3, fu
                                               {'scalar': {'int':(3, 30)}}])
 
 @jit(nopython=True)
-def _ts_mean_return(X, d):
+def _ts_mean(X, d):
     d = len(X) - 1 if d >= len(X) else d
     res = np.full(len(X), np.nan)
     s = np.sum(X[:d])
@@ -208,10 +209,10 @@ def _ts_mean_return(X, d):
         s += X[i + 1] - X[i - d + 1]
     return res
 
-ts_mean_return = functions.make_function(function=_ts_mean_return, name='ts_mean_return', arity=2,
-                                         function_type='time_series',
-                                         param_type=[{'vector': {'number': (None, None)}},
-                                                     {'scalar': {'int':(3, 30)}}])
+ts_mean = functions.make_function(function=_ts_mean, name='ts_mean', arity=2,
+                                  function_type='time_series',
+                                  param_type=[{'vector': {'number': (None, None)}},
+                                              {'scalar': {'int':(3, 30)}}])
 
 @jit(nopython=True)
 def _ts_neutralize(X, d):
@@ -317,7 +318,7 @@ def _KAMA(X, d):
         __res[_l + i] = _at * X[i] + (1 - _at) * (__res[_l + i - 1] if i != d else X[i - 1])
     return __res
 
-KAMA = functions.make_function(function=_KAMA, name='DEMA', arity=2, function_type='time_series',
+KAMA = functions.make_function(function=_KAMA, name='KAMA', arity=2, function_type='time_series',
                                param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @nb.jit(nopython=True)
@@ -329,7 +330,7 @@ def _MIDPOINT(X, d):
         res[i] = (np.nanmax(X[i-d+1:i+1]) + np.nanmin(X[i-d+1:i+1])) / 2
     return res
 
-MIDPOINT = functions.make_function(function=_MIDPOINT, name='MA', arity=2, function_type='time_series',
+MIDPOINT = functions.make_function(function=_MIDPOINT, name='MIDPOINT', arity=2, function_type='time_series',
                                    param_type=[{'vector': {'number': (None, None)}}, {'scalar': {'int':(3, 30)}}])
 
 @nb.jit(nopython=True)
@@ -487,6 +488,17 @@ freq = functions.make_function(function=_FREQ_SECTION, name='freq', arity=1,
 
 @no_numpy_warning
 def _CUT_EQUAL_DISTANCE(X, d):
+    '''
+    等距分组
+    Parameters
+    ----------
+    X
+    d
+
+    Returns
+    -------
+
+    '''
     d = len(X) - 1 if d >= len(X) - 1 else d
     bins = [np.min(X) + i * (np.max(X) - np.min(X)) * 1.000001 / d for i in range(d + 1)]
     return np.digitize(X, bins)
@@ -586,7 +598,7 @@ groupby_freq = functions.make_function(function=_GROUPBYTHENFREQ, name='gb_freq'
                                                    {'vector': {'category': (None, None)}}])
 
 __all__ = ['delay', 'delta', 'sec_max', 'sec_min', 'sec_median', 'ts_min', 'ts_max', 'ts_sum', 'ts_corr', 'ts_rank',
-           'ts_stddev', 'ts_argmax', 'ts_argmin', 'ts_mean_return', 'EMA', 'DEMA', 'KAMA', 'MA', 'MIDPOINT',
+           'ts_stddev', 'ts_argmax', 'ts_argmin', 'ts_mean', 'EMA', 'DEMA', 'KAMA', 'MA', 'MIDPOINT',
            'BETA', 'LINEARREG_ANGLE', 'LINEARREG_SLOPE', 'LINEARREG_INTERCEPT', 'sec_std', 'sec_rank', 'sec_mean',
            'groupby_std', 'groupby_max', 'groupby_median', 'groupby_mean', 'groupby_rank', 'groupby_min',
            'ts_neutralize', 'sec_neutralize', 'groupby_neutralize', 'cut_equal_amount', 'cut_equal_distance',
@@ -595,8 +607,8 @@ __all__ = ['delay', 'delta', 'sec_max', 'sec_min', 'sec_median', 'ts_min', 'ts_m
 def test():
     a = np.random.uniform(0.9, 1.1, 30)
     b = np.random.uniform(0.9, 1.1, 30)
-    print(delay(a, 3))
-    print(_ts_freq(a, 3))
+    c = np.random.randint(0, 2, size=30)
+    print(groupby_cut_equal_distance(c,a,3))
 
 
 if __name__ == "__main__":
