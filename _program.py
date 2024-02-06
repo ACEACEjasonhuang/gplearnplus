@@ -90,11 +90,12 @@ class _Program(object):
         self._max_samples = None
         self._indices_state = None
 
-    def build_program(self, random_state):
+    def build_program(self, random_state, type='number'):
         """
         参数中无program 初始化方法
         # v1.55 修改数的生成逻辑
         :param random_state: RandomState 对象， 随机数生成器
+        :param type: 生成树返回数值还是分类
         :return: list,
         """
         if self.init_method == 'half and half':
@@ -127,7 +128,7 @@ class _Program(object):
             # 深度优先的方式构建公式树，迭代处理工作栈中最后一个子树第一个子节点
             # 与gplearn主要不同点
             if ('vector' in terminal_stack[-1][0]) and (depth < max_depth) \
-                    and (method == 'full' or candidate_choice <= (self.num_func_number + self.cat_func_number)):
+                    and (method == 'full' or candidate_choice < (self.num_func_number + self.cat_func_number)):
                 # 插入函数的要求，1 该节点必须接受向量，2.当前深度比最大深度低， 3.随机种子选中了函数或者模式为‘full’
                 
                 # 决定选择数值型函数 还是 分类型函数
@@ -165,13 +166,16 @@ class _Program(object):
                     # 插入向量
                     if 'number' in terminal_stack[-1][0]['vector'] and 'category' in terminal_stack[-1][0][
                         'vector']:
+                        # 可插入数值向量也可插入分类向量
                         key = 'category' if _choice < self.n_cat_features else 'number'
                     else:
                         key = 'number' if 'number' in terminal_stack[-1][0]['vector'] else 'category'
                     if self.n_cat_features == 0 and key == 'category':
-                        raise ValueError("There no category var in input features, but it need")
-                    candicate_var = (_choice % self.n_cat_features) if key == 'category' else \
-                            ((_choice % (self.n_features - self.n_cat_features) + self.n_cat_features))
+                        # 需要插入分类向量，特征中却没有分类向量的情况，插入常数分类向量1, 默认0
+                        candicate_var = 0
+                    else:
+                        candicate_var = (_choice % self.n_cat_features) + 1 if key == 'category' else \
+                                ((_choice % (self.n_features - self.n_cat_features) + self.n_cat_features) + 1)
                     program.append(str(candicate_var))
                 else:
                     # 插入常量
@@ -332,8 +336,8 @@ class _Program(object):
         Parameters
         ----------
         X : {array-like}
-            若数据类型为'section'，'time_series'则为[n_samples, n_features]
-            若数据类型为'panel', 则为[n_samples, n_features + 2]
+            若数据类型为'section'，'time_series'则为[n_samples, n_features + 1]
+            若数据类型为'panel', 则为[n_samples, n_features + 3]
 
         Returns
         -------
@@ -342,10 +346,10 @@ class _Program(object):
 
         """
         # 检验X列数是否正确
-        if self.data_type == 'panel' and X.shape[1] != self.n_features + 2:
-            raise ValueError("For panel Data, the col number of X should be n_features + 2")
-        elif self.data_type in ['section', 'time_series'] and X.shape[1] != self.n_features:
-            raise ValueError("For section or time_series Data, the col number of X should be n_features")
+        if self.data_type == 'panel' and X.shape[1] != self.n_features + 3:
+            raise ValueError("For panel Data, the col number of X should be n_features + 3")
+        elif self.data_type in ['section', 'time_series'] and X.shape[1] != self.n_features + 1:
+            raise ValueError("For section or time_series Data, the col number of X should be n_features + 1")
 
         # Check for single-node programs
         node = self.program[0]
@@ -373,10 +377,10 @@ class _Program(object):
                              else t) for t in apply_stack[-1][1:]]
                 # 对于时序和截面函数加入管道
                 if self.data_type == 'panel' and function.function_type == 'section':
-                    time_series_data = X.iloc[:, -1]
+                    time_series_data = X[:, -1]
                     intermediate_result = _groupby(time_series_data, function, *terminals)
                 elif self.data_type == 'panel' and function.function_type == 'time_series':
-                    security_data = X.iloc[:, -2]
+                    security_data = X[:, -2]
                     intermediate_result = _groupby(security_data, function, *terminals)
                 else:
                     intermediate_result = function(*terminals)
@@ -451,8 +455,8 @@ class _Program(object):
         Parameters
         ----------
         X : {array-like}
-            若数据类型为'section'，'time_series'则为[n_samples, n_features]
-            若数据类型为'panel', 则为[n_samples, n_features + 2]
+            若数据类型为'section'，'time_series'则为[n_samples, n_features + 1]
+            若数据类型为'panel', 则为[n_samples, n_features + 3]
 
         y : array-like, shape = [n_samples]
             Target values.
@@ -497,9 +501,34 @@ class _Program(object):
         penalty = parsimony_coefficient * len(self.program) * self.metric.sign
         return self.raw_fitness_ - penalty
 
+    # 此函数为获得指定子树
+    def get_subtree(self, start, program=None):
+        """
+
+        Parameters
+        ----------
+        start: 子树的根节点位置
+        program
+        Returns
+        -------
+        start
+        end 子树截止位置 + 1 便于索引
+        """
+        if program is None:
+            program = self.program
+        stack = 1
+        end = start
+        while stack > end - start:
+            node = program[end]
+            if isinstance(node, _Function):
+                stack += node.arity
+            end += 1
+        return start, end
+
+    # 此函数为获得随机子树
     # 此处做了修改，不会选到标量
     # 需要考虑返回类型
-    def get_subtree(self, random_state, program=None, type=None):
+    def get_random_subtree(self, random_state, program=None, return_type=None):
         """Get a random subtree from the program.
 
         Parameters
@@ -511,7 +540,7 @@ class _Program(object):
             The flattened tree representation of the program. If None, the
             embedded tree in the object will be used.
 
-        type: 子数的返回类型限定 默认 None, number 和 category都可以选择
+        return_type: 子数的返回类型限定 默认 None, number 和 category都可以选择
 
         Returns
         -------
@@ -522,34 +551,56 @@ class _Program(object):
         if program is None:
             program = self.program
         # Choice of crossover points follows Koza's (1992) widely used approach
-        # 子数节点概率权重90%，向量叶子节点概率权重10%，标量叶子节点概率权重0
+        # 子数节点概率权重90%，向量叶子节点概率权重10%，标量叶包括常分类向量子节点概率权重0
         # 若type为number， 所有返回category的节点概率权重为0
         # 若type为category， 所有返回number的节点概率权重为0
-        probs = np.array([0.9 if isinstance(node, _Function) else (0.1 if isinstance(node, str) else 0.0)
-                          for node in program])
+        if return_type not in ['number', 'category', None]:
+            raise ValueError("Type of sub_tree should be number, category or None")
+        if return_type == 'number':
+            probs = np.array([0.9 if isinstance(node, _Function) and node.return_type == 'number'
+                              else (0.1 if isinstance(node, str) and int(node) > self.n_cat_features else 0.0)
+                              for node in program])
+        elif return_type == 'category':
+            probs = np.array([0.9 if isinstance(node, _Function) and node.return_type == 'category'
+                              else (0.1 if isinstance(node, str) and int(node) <= self.n_cat_features
+                                    and int(node) != 0 else 0.0)
+                              for node in program])
+        else:
+            probs = np.array([0.9 if isinstance(node, _Function)
+                              else (0.1 if isinstance(node, str)
+                                    and int(node) != 0 else 0.0)
+                              for node in program])
         probs = np.cumsum(probs / probs.sum())
         start = np.searchsorted(probs, random_state.uniform())
 
-        stack = 1
-        end = start
-        while stack > end - start:
-            node = program[end]
-            if isinstance(node, _Function):
-                stack += node.arity
-            end += 1
+        start, end = self.get_subtree(start, program)
 
-        if isinstance(program[start], _Function):
+        if return_type is not None:
+            return start, end, return_type
+        elif isinstance(program[start], _Function):
             return_type = _Function.return_type
         elif isinstance(program[start], str):
-            return_type = 'category' if int(program[start]) < self.n_cat_features else 'number'
+            if int(program[start]) == 0:
+                raise ValueError("The return of sub_tree's root should not be const_1")
+            return_type = 'category' if int(program[start]) <= self.n_cat_features else 'number'
         else:
             raise ValueError("The return type of sub_tree's root should be number or category")
-
         return start, end, return_type
 
     def reproduce(self):
         """Return a copy of the embedded program."""
         return copy(self.program)
+
+    def vaild_category(self, program=None):
+        """验证公式树中是否包含分类向量或子树， 不包括常数分类向量"""
+        if program is None:
+            program = self.program
+        for node in program:
+            if isinstance(node, _Function) and node.return_type == 'category':
+                return True
+            elif isinstance(node, str) and int(node) != 0 and int(node) <= self.n_cat_features:
+                return True
+        return False
 
     # 交换self 和 donor 的子树
     # 此处不会交换常数
@@ -575,10 +626,14 @@ class _Program(object):
 
         """
         # Get a subtree to replace
-        start, end = self.get_subtree(random_state)
+        # 若都包含
+        if self.vaild_category() and self.vaild_category(donor):
+            start, end, self_return_type = self.get_random_subtree(random_state)
+        else:
+            start, end, self_return_type = self.get_random_subtree(random_state, return_type='number')
         removed = range(start, end)
         # Get a subtree to donate
-        donor_start, donor_end = self.get_subtree(random_state, donor)
+        donor_start, donor_end, donor_return_type = self.get_random_subtree(random_state, donor, self_return_type)
         donor_removed = list(set(range(len(donor))) -
                              set(range(donor_start, donor_end)))
         # Insert genetic material from donor
@@ -587,6 +642,7 @@ class _Program(object):
                 self.program[end:]), removed, donor_removed
 
     # 此处不会选择常数
+    # 子数变异
     def subtree_mutation(self, random_state):
         """Perform the subtree mutation operation on the program.
 
@@ -613,8 +669,55 @@ class _Program(object):
         # Do subtree mutation via the headless chicken method!
         return self.crossover(chicken, random_state)
 
+    def get_hoist_list(self, program=None):
+        """
+        判断公式树哪些节点可以做hoist变异, 该节点非叶子节点 且 存在与自身同类型的子树， 常分类向量不算分类向量的同类型
+        Parameters
+        ----------
+        program
+
+        Returns
+        -------
+        hoist_list
+        """
+        if program is None:
+            program = self.program
+
+        apply_stack = []
+        hoist_list = [False] * len(program)
+        # 深度优先搜索，压入栈中的元素是一个list，list第一个元素表示函数再program列表中的位置，第二个元素是函数对象，后面的元素是返回结果
+        # 深搜结果为['number'], ['number','category'], ['category'], [], 表示该节点及其子节点所包含的类型集合
+        for i, node in enumerate(program):
+            if isinstance(node, _Function):
+                apply_stack.append([i, node])
+            else:
+                # Lazily evaluate later
+                apply_stack[-1].append(node)
+            while len(apply_stack[-1]) == apply_stack[-1][1].arity + 2:
+                father_type = apply_stack[-1][1].return_type
+                type_list = [t if isinstance(t, list) else
+                             (['number'] if isinstance(t, str) and int(t) > self.n_cat_features else
+                             (['category'] if isinstance(t, str) and int(t) <= self.n_cat_features and int(t) != 0
+                              else []))
+                             for t in apply_stack[-1][2:]
+                             ]
+                # 判断子树中是否存在与本节点同类型的节点，若存在表示可以hoist变异
+                if father_type in list(set().union(*type_list)):
+                    hoist_list[apply_stack[-1][0]] = True
+                # 函数返回类型加入列表
+                type_list.append([father_type])
+
+                intermediate_result = list(set().union(*type_list))
+                if len(apply_stack) != 1:
+                    apply_stack.pop()
+                    apply_stack[-1].append(intermediate_result)
+                else:
+                    return hoist_list
+        return None
+
     # 将子树的子树变上提，简化公式
     # 由于子树不会选到常数，故符合条件
+    # 子数不会选到分类变量
     def hoist_mutation(self, random_state):
         """Perform the hoist mutation operation on the program.
 
@@ -622,6 +725,10 @@ class _Program(object):
         be replaced. A random subtree of that subtree is then selected and this
         is 'hoisted' into the original subtrees location to form an offspring.
         This method helps to control bloat.
+
+        gplearnplus修改，由于引入了变量类型，需要先考哪些节点可以hosit变异的节点
+        要求
+        1. 该节点下存在于节点同类型的子树
 
         Parameters
         ----------
@@ -635,10 +742,10 @@ class _Program(object):
 
         """
         # Get a subtree to replace
-        start, end = self.get_subtree(random_state)
+        start, end, _ = self.get_random_subtree(random_state, return_type='number')
         subtree = self.program[start:end]
         # Get a subtree of the subtree to hoist
-        sub_start, sub_end = self.get_subtree(random_state, subtree)
+        sub_start, sub_end, _ = self.get_random_subtree(random_state, subtree, return_type='number')
         hoist = subtree[sub_start:sub_end]
         # Determine which nodes were removed for plotting
         removed = list(set(range(start, end)) -

@@ -39,7 +39,7 @@ class _Function(object):
 
     param_type : [{
                   'vector': {'category': (None, None), 'number': (None, None)},
-                  'scalar': {'int': (None, None), 'float': (None, None)}
+                  'scalar': {'int': (int, int), 'float': (float, float)}
                   },]
     function_type : 'all', 'section', 'time_series‘
     return_type: 'number', 'category'
@@ -52,16 +52,18 @@ class _Function(object):
         self.arity = arity
         if param_type is None:
             # 默认不接受分类类型
-            param_type = arity * [{'vector':{'number': (None, None)},
+            param_type = arity * [{'vector': {'number': (None, None)},
                                    'scalar': {'int': (None, None), 'float': (None, None)}}]
         else:
             # 防止长度不一
             if len(param_type) != arity:
                 raise ValueError(
-                    "length of param_type should be equal to arity, it should be {}, not {}".format(arity, len(param_type)))
+                    "length of param_type should be equal to arity, it should be {}, not {}"
+                    .format(arity, len(param_type)))
         self.param_type = param_type
         if (return_type != 'number') and (return_type != 'category'):
-            raise ValueError("return_type of function {} should be number or category, NOT {}".format(name, return_type))
+            raise ValueError("return_type of function {} should be number or category, NOT {}"
+                             .format(name, return_type))
         self.return_type = return_type
         self.function_type = function_type
 
@@ -361,8 +363,6 @@ def _groupby(gbx, func, *args, **kwargs):
     result_list = [func(*(split[:, 2:].T), **kwargs) for split in splits]
     result = np.hstack(result_list)
     return result[indices.argsort()]
-
-
 
 
 add2 = _Function(function=np.add, name='add', arity=2)
