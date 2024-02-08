@@ -38,17 +38,15 @@ __all__ = ['SymbolicRegressor', 'SymbolicClassifier', 'SymbolicTransformer']
 MAX_INT = np.iinfo(np.int32).max
 
 # 并行实现子树交叉，变异
-def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data, sample_weight, seeds, params):
+def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
     """
 
     Parameters
     ----------
-    n_programs: 遗传代数
+    n_programs: 种群数量
     parents：父辈个体集合
     X：原始特征
     y：预测label
-    security_data：个体标记， 时序数据为none
-    time_series_data：时间标记， 界面数据为none
     sample_weight：抽样比例
     seeds：随机种子
     params：参数
@@ -60,6 +58,7 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
 
     """Private function used to build a batch of programs within a job."""
     n_samples, n_features = X.shape
+
     # Unpack parameters
     tournament_size = params['tournament_size']
     function_dict = params['function_dict']
@@ -73,15 +72,20 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
     method_probs = params['method_probs']
     data_type = params['data_type']
     p_point_replace = params['p_point_replace']
-    max_samples = params['max_samples']
+    max_samples = params['max_samples']  # 最大样本比例
     feature_names = params['feature_names']
     n_cat_features = params['cat_var_number']
-    data_type = params['data_type']
+
+    # 处理不同类型的数据X
+    if data_type == 'panel':
+        n_features -= 3
+    else:
+        n_features -= 1
 
     max_samples = int(max_samples * n_samples)
 
     def _tournament():
-        # 从所有父代中随机选择tournament_size个，取其中最优个体子代
+        # 从所有父代中随机选择tournament_size个，取其中最优的那一个子代
         """Find the fittest individual from a sub-population."""
         contenders = random_state.randint(0, len(parents), tournament_size)
         fitness = [parents[p].fitness_ for p in contenders]
@@ -99,12 +103,15 @@ def _parallel_evolve(n_programs, parents, X, y, security_data, time_series_data,
         random_state = check_random_state(seeds[i])
 
         if parents is None:
+            # 初代
             program = None
             genome = None
         else:
             method = random_state.uniform()
+            # 在父辈个体集合中抽样选择一个最优的父辈
             parent, parent_index = _tournament()
 
+            # 随机进行一种交叉 or 变异
             if method < method_probs[0]:
                 # crossover
                 donor, donor_index = _tournament()
@@ -301,6 +308,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                                      remaining_time))
 
     # fit 的时候考虑时序问题
+    # 转移出数据处理模块
     def fit(self, X, y, sample_weight=None):
         """Fit the Genetic Program according to X, y.
 

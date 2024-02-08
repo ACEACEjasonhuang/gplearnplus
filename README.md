@@ -63,8 +63,10 @@ graph TB
 ### 树的检验
 `validate_program`
 对树一次深度优先搜索，保证所有节点完备，即每一个函数参数量足够
+
 `_depth`
 深度优先搜索的同时记录最大深度
+
 `_length`
 返回program长度，即树的节点数量
 
@@ -96,19 +98,47 @@ $$
 
 返回抽样内样本index和抽样外样本index
 
-### 公式树交叉变异
+### 公式树的截取
 
-`get_sub_tree(random_state, program=None, type=None)`：获取子树
+`get_subtree(random_state, start, program=None)`：获取指定子树
+获取根节点为start的指定子树
 
+
+`get_random_subtree(random_state, program=None, return_type=None):`获取随机子树
 根据需要设定获取**数值型子树**还是**分类型子树**
 返回子树和子树类型
 
+### 公式树的交叉变异
+
+`crossover(donor, random_state)`
+与公式树`donor`交叉，要求同返回类型
+
+`subtree_mutation(random_state)`
+随机生成一颗公式树，与父树交叉
+
+`hoist_mutation(random_state)`
+首先寻找可以hoist的节点，要求该节点下存在子节点与自己类型相同
+把一颗子树的同类型子树上提
+
+`point_mutation(random_state)`
+点变异
+对随机选中的点进行点变异
+点变异保证函数合法
 
 
 ## `fitness.py`
 
 定义适应度函数，和自定义适应函数的方法
 
+定义函数对象`_Fitness`
+
+包含是属性：
+
+`function`
+
+必须接受三个变量`(y, y_perd, w)`
+
+`greater_is_better`
 
 
 ## `function.py`
@@ -123,7 +153,8 @@ $$
 
 `arity`：参数个数
 
-`param_type`：参数类型列表，长度与arity一致，默认不接受分类类型
+`param_type`：
+参数类型列表，长度与arity一致，**默认不接受分类类型**
 该设计是本项目最重要的升级，影响公式树的构建
 ```python
 [{
@@ -138,10 +169,40 @@ $$
 `return_type`：返回类型 默认'number'
 'number', 'category'
 
+包含的方法：
+
+`__call__`
+调用函数特殊处理，
+参数仅接受标量，却传入向量
+则取向量第一个值为标量
+
+`add_range`:
+
+替换掉参数中没有约束的范围，给所有标量限制范围
+
+若没有const_range, 则表明所有函数不接收常数， 去掉所有的const type
+
+`is_point_mutation(candidate_func)`
+
+检验某个待替换函数是否可以替换
+
+外部函数：
+`make_function(*, function, name, arity, param_type=None, wrap=True, return_type='number', function_type='all')`
+将函数处理为_Funtion对象
+主要进行合法性检验和测试
 
 ## `genetic.py`
 
 模型接口，包括由工厂类派生出，回归，分类器和特征工程工具类，应用于不同场景
+
+### '_parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params)'
+
+进行一次种群进化
+n_programs为种群数量
+
+
+### `BaseSymbolic`
+
 
 
 
@@ -152,6 +213,12 @@ $$
 
 
 `test.py`
+
+
+`data_trans.py`
+
+
+
 
 自定义函数样例
 

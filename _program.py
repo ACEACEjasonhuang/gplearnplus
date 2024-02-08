@@ -523,7 +523,16 @@ class _Program(object):
             if isinstance(node, _Function):
                 stack += node.arity
             end += 1
-        return start, end
+
+        if isinstance(program[start], _Function):
+            return_type = _Function.return_type
+        elif isinstance(program[start], str):
+            if int(program[start]) == 0:
+                raise ValueError("The return of sub_tree's root should not be const_1")
+            return_type = 'category' if int(program[start]) <= self.n_cat_features else 'number'
+        else:
+            raise ValueError("The return type of sub_tree's root should be number or category")
+        return start, end, return_type
 
     # 此函数为获得随机子树
     # 此处做了修改，不会选到标量
@@ -572,20 +581,7 @@ class _Program(object):
                               for node in program])
         probs = np.cumsum(probs / probs.sum())
         start = np.searchsorted(probs, random_state.uniform())
-
-        start, end = self.get_subtree(start, program)
-
-        if return_type is not None:
-            return start, end, return_type
-        elif isinstance(program[start], _Function):
-            return_type = _Function.return_type
-        elif isinstance(program[start], str):
-            if int(program[start]) == 0:
-                raise ValueError("The return of sub_tree's root should not be const_1")
-            return_type = 'category' if int(program[start]) <= self.n_cat_features else 'number'
-        else:
-            raise ValueError("The return type of sub_tree's root should be number or category")
-        return start, end, return_type
+        return self.get_subtree(start, program)
 
     def reproduce(self):
         """Return a copy of the embedded program."""
@@ -742,10 +738,15 @@ class _Program(object):
 
         """
         # Get a subtree to replace
-        start, end, _ = self.get_random_subtree(random_state, return_type='number')
+        hoist_list = self.get_hoist_list()
+        if sum(hoist_list) == 0:
+            return self.program
+        # 随机选取可以hoist的节点
+        hoist_root = random_state.choice(np.where(hoist_list)[0])
+        start, end, return_type = self.get_subtree(hoist_root)
         subtree = self.program[start:end]
         # Get a subtree of the subtree to hoist
-        sub_start, sub_end, _ = self.get_random_subtree(random_state, subtree, return_type='number')
+        sub_start, sub_end, _ = self.get_random_subtree(random_state, subtree, return_type=return_type)
         hoist = subtree[sub_start:sub_end]
         # Determine which nodes were removed for plotting
         removed = list(set(range(start, end)) -
@@ -794,7 +795,7 @@ class _Program(object):
                 program[node] = replacement
             elif isinstance(program[node], str):
                 # We've got a terminal, add a const or variable
-                terminal = random_state.randint(self.n_features)
+                terminal = random_state.randint(1, self.n_features + 1)
                 program[node] = str(terminal)
             else:
                 # 常数不发生变异
